@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
+	"github.com/bsv-blockchain/go-sdk/util"
 	"github.com/bsv-blockchain/go-sdk/wallet"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,7 +18,7 @@ func TestIsTokenSignatureCorrectlyLinked(t *testing.T) {
 		seed := make([]byte, 32)
 		seed[0] = 42
 		signerKey, _ := ec.PrivateKeyFromBytes(seed)
-		
+
 		signerWallet, err := wallet.NewWallet(signerKey)
 		require.NoError(t, err)
 
@@ -27,7 +28,7 @@ func TestIsTokenSignatureCorrectlyLinked(t *testing.T) {
 			IdentityKey:    true,
 		}, "")
 		require.NoError(t, err)
-		
+
 		// Create fields
 		fields := [][]byte{
 			[]byte("SHIP"),
@@ -35,19 +36,19 @@ func TestIsTokenSignatureCorrectlyLinked(t *testing.T) {
 			[]byte("https://domain.com"),
 			[]byte("tm_meter"),
 		}
-		
+
 		// Create data by concatenating fields
 		var data []byte
 		for _, field := range fields {
 			data = append(data, field...)
 		}
-		
+
 		// Create signature
 		signResult, err := signerWallet.CreateSignature(ctx, wallet.CreateSignatureArgs{
 			EncryptionArgs: wallet.EncryptionArgs{
 				ProtocolID: wallet.Protocol{
 					SecurityLevel: wallet.SecurityLevelEveryApp,
-					Protocol:     "service host interconnect",
+					Protocol:      "service host interconnect",
 				},
 				KeyID: "1",
 				Counterparty: wallet.Counterparty{
@@ -57,26 +58,26 @@ func TestIsTokenSignatureCorrectlyLinked(t *testing.T) {
 			Data: data,
 		}, "")
 		require.NoError(t, err)
-		
+
 		// Add signature to fields
 		fields = append(fields, signResult.Signature.Serialize())
-		
+
 		// Get the locking public key
 		lockingKeyResult, err := signerWallet.GetPublicKey(ctx, wallet.GetPublicKeyArgs{
 			EncryptionArgs: wallet.EncryptionArgs{
 				ProtocolID: wallet.Protocol{
 					SecurityLevel: wallet.SecurityLevelEveryApp,
-					Protocol:     "service host interconnect",
+					Protocol:      "service host interconnect",
 				},
 				KeyID: "1",
 				Counterparty: wallet.Counterparty{
 					Type: wallet.CounterpartyTypeAnyone,
 				},
 			},
-			ForSelf: true,
+			ForSelf: util.BoolPtr(true),
 		}, "")
 		require.NoError(t, err)
-		
+
 		// Validate
 		valid := IsTokenSignatureCorrectlyLinked(lockingKeyResult.PublicKey, fields)
 		assert.True(t, valid)
@@ -88,7 +89,7 @@ func TestIsTokenSignatureCorrectlyLinked(t *testing.T) {
 		seed := make([]byte, 32)
 		seed[0] = 42
 		signerKey, _ := ec.PrivateKeyFromBytes(seed)
-		
+
 		signerWallet, err := wallet.NewWallet(signerKey)
 		require.NoError(t, err)
 
@@ -98,7 +99,7 @@ func TestIsTokenSignatureCorrectlyLinked(t *testing.T) {
 			IdentityKey:    true,
 		}, "")
 		require.NoError(t, err)
-		
+
 		// Create fields
 		fields := [][]byte{
 			[]byte("SHIP"),
@@ -106,19 +107,19 @@ func TestIsTokenSignatureCorrectlyLinked(t *testing.T) {
 			[]byte("https://domain.com"),
 			[]byte("tm_meter"),
 		}
-		
+
 		// Create data by concatenating fields
 		var data []byte
 		for _, field := range fields {
 			data = append(data, field...)
 		}
-		
+
 		// Create signature
 		signResult, err := signerWallet.CreateSignature(ctx, wallet.CreateSignatureArgs{
 			EncryptionArgs: wallet.EncryptionArgs{
 				ProtocolID: wallet.Protocol{
 					SecurityLevel: wallet.SecurityLevelEveryApp,
-					Protocol:     "service host interconnect",
+					Protocol:      "service host interconnect",
 				},
 				KeyID: "1",
 				Counterparty: wallet.Counterparty{
@@ -128,29 +129,29 @@ func TestIsTokenSignatureCorrectlyLinked(t *testing.T) {
 			Data: data,
 		}, "")
 		require.NoError(t, err)
-		
+
 		// Add signature to fields
 		fields = append(fields, signResult.Signature.Serialize())
-		
+
 		// Get the locking public key
 		lockingKeyResult, err := signerWallet.GetPublicKey(ctx, wallet.GetPublicKeyArgs{
 			EncryptionArgs: wallet.EncryptionArgs{
 				ProtocolID: wallet.Protocol{
 					SecurityLevel: wallet.SecurityLevelEveryApp,
-					Protocol:     "service host interconnect",
+					Protocol:      "service host interconnect",
 				},
 				KeyID: "1",
 				Counterparty: wallet.Counterparty{
 					Type: wallet.CounterpartyTypeAnyone,
 				},
 			},
-			ForSelf: true,
+			ForSelf: util.BoolPtr(true),
 		}, "")
 		require.NoError(t, err)
-		
+
 		// Tamper with fields - change SHIP to SLAP
 		fields[0] = []byte("SLAP")
-		
+
 		// Validate - should fail because data was tampered
 		valid := IsTokenSignatureCorrectlyLinked(lockingKeyResult.PublicKey, fields)
 		assert.False(t, valid)
@@ -161,7 +162,7 @@ func TestIsTokenSignatureCorrectlyLinked(t *testing.T) {
 		seed := make([]byte, 32)
 		seed[0] = 42
 		signerKey, _ := ec.PrivateKeyFromBytes(seed)
-		
+
 		signerWallet, err := wallet.NewWallet(signerKey)
 		require.NoError(t, err)
 
@@ -169,7 +170,7 @@ func TestIsTokenSignatureCorrectlyLinked(t *testing.T) {
 		taylorSeed := make([]byte, 32)
 		taylorSeed[0] = 69
 		taylorSwiftKey, _ := ec.PrivateKeyFromBytes(taylorSeed)
-		
+
 		taylorSwiftWallet, err := wallet.NewWallet(taylorSwiftKey)
 		require.NoError(t, err)
 
@@ -179,7 +180,7 @@ func TestIsTokenSignatureCorrectlyLinked(t *testing.T) {
 			IdentityKey:    true,
 		}, "")
 		require.NoError(t, err)
-		
+
 		// Create fields claiming to be Taylor Swift
 		fields := [][]byte{
 			[]byte("SHIP"),
@@ -187,19 +188,19 @@ func TestIsTokenSignatureCorrectlyLinked(t *testing.T) {
 			[]byte("https://domain.com"),
 			[]byte("tm_meter"),
 		}
-		
+
 		// Create data by concatenating fields
 		var data []byte
 		for _, field := range fields {
 			data = append(data, field...)
 		}
-		
+
 		// Create signature with signer's key (not Taylor Swift's)
 		signResult, err := signerWallet.CreateSignature(ctx, wallet.CreateSignatureArgs{
 			EncryptionArgs: wallet.EncryptionArgs{
 				ProtocolID: wallet.Protocol{
 					SecurityLevel: wallet.SecurityLevelEveryApp,
-					Protocol:     "service host interconnect",
+					Protocol:      "service host interconnect",
 				},
 				KeyID: "1",
 				Counterparty: wallet.Counterparty{
@@ -209,26 +210,26 @@ func TestIsTokenSignatureCorrectlyLinked(t *testing.T) {
 			Data: data,
 		}, "")
 		require.NoError(t, err)
-		
+
 		// Add signature to fields
 		fields = append(fields, signResult.Signature.Serialize())
-		
+
 		// Get the locking public key from signer (not Taylor Swift)
 		lockingKeyResult, err := signerWallet.GetPublicKey(ctx, wallet.GetPublicKeyArgs{
 			EncryptionArgs: wallet.EncryptionArgs{
 				ProtocolID: wallet.Protocol{
 					SecurityLevel: wallet.SecurityLevelEveryApp,
-					Protocol:     "service host interconnect",
+					Protocol:      "service host interconnect",
 				},
 				KeyID: "1",
 				Counterparty: wallet.Counterparty{
 					Type: wallet.CounterpartyTypeAnyone,
 				},
 			},
-			ForSelf: true,
+			ForSelf: util.BoolPtr(true),
 		}, "")
 		require.NoError(t, err)
-		
+
 		// Validate - should fail because they're pretending to be someone they're not
 		valid := IsTokenSignatureCorrectlyLinked(lockingKeyResult.PublicKey, fields)
 		assert.False(t, valid)

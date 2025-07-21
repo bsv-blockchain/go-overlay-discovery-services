@@ -4,10 +4,11 @@ import (
 	"context"
 
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
+	"github.com/bsv-blockchain/go-sdk/util"
 	"github.com/bsv-blockchain/go-sdk/wallet"
 )
 
-// IsTokenSignatureCorrectlyLinked checks that the BRC-48 locking key and the signature 
+// IsTokenSignatureCorrectlyLinked checks that the BRC-48 locking key and the signature
 // are valid and linked to the claimed identity key.
 func IsTokenSignatureCorrectlyLinked(lockingPublicKey *ec.PublicKey, fields [][]byte) bool {
 	if len(fields) < 3 {
@@ -35,12 +36,12 @@ func IsTokenSignatureCorrectlyLinked(lockingPublicKey *ec.PublicKey, fields [][]
 	case "SHIP":
 		protocol = wallet.Protocol{
 			SecurityLevel: wallet.SecurityLevelEveryApp,
-			Protocol:     "service host interconnect",
+			Protocol:      "service host interconnect",
 		}
 	case "SLAP":
 		protocol = wallet.Protocol{
 			SecurityLevel: wallet.SecurityLevelEveryApp,
-			Protocol:     "service lookup availability",
+			Protocol:      "service lookup availability",
 		}
 	default:
 		return false
@@ -96,7 +97,7 @@ func IsTokenSignatureCorrectlyLinked(lockingPublicKey *ec.PublicKey, fields [][]
 				Counterparty: identityPubKey,
 			},
 		},
-		ForSelf: false,
+		ForSelf: util.BoolPtr(false),
 	}
 
 	pubKeyResult, err := anyoneWallet.GetPublicKey(ctx, pubKeyArgs, "")
