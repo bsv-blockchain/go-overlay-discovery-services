@@ -3,7 +3,6 @@ module github.com/bsv-blockchain/go-overlay-discovery-services
 go 1.24
 
 require (
-	github.com/bsv-blockchain/go-template v1.2.0
 	github.com/stretchr/testify v1.10.0
 	go.mongodb.org/mongo-driver v1.12.1
 )
