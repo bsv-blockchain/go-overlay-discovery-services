@@ -142,3 +142,116 @@ type TaggedBEEF struct {
 	// Topics are the metadata topics associated with this BEEF
 	Topics []string `json:"topics,omitempty" bson:"topics,omitempty"`
 }
+
+// BSV Overlay Interface Types
+// These types define the interfaces used by BSV overlay services for lookup operations.
+
+// AdmissionMode represents the mode for output admission
+type AdmissionMode string
+
+const (
+	// AdmissionModeLockingScript indicates admission by locking script
+	AdmissionModeLockingScript AdmissionMode = "locking-script"
+)
+
+// SpendNotificationMode represents the mode for spend notifications
+type SpendNotificationMode string
+
+const (
+	// SpendNotificationModeNone indicates no spend notifications
+	SpendNotificationModeNone SpendNotificationMode = "none"
+)
+
+// OutputAdmittedByTopic represents the payload for an output admitted by topic
+type OutputAdmittedByTopic struct {
+	// Mode is the admission mode (should be "locking-script" for SHIP)
+	Mode AdmissionMode `json:"mode"`
+	// Topic is the topic that admitted this output (should be "tm_ship" for SHIP)
+	Topic string `json:"topic"`
+	// LockingScript is the locking script of the output in hex format
+	LockingScript string `json:"lockingScript"`
+	// Txid is the transaction ID of the output
+	Txid string `json:"txid"`
+	// OutputIndex is the index of the output within the transaction
+	OutputIndex int `json:"outputIndex"`
+}
+
+// OutputSpent represents the payload for a spent output
+type OutputSpent struct {
+	// Mode is the spend notification mode (should be "none" for SHIP)
+	Mode SpendNotificationMode `json:"mode"`
+	// Topic is the topic associated with this output
+	Topic string `json:"topic"`
+	// Txid is the transaction ID of the spent output
+	Txid string `json:"txid"`
+	// OutputIndex is the index of the spent output within the transaction
+	OutputIndex int `json:"outputIndex"`
+}
+
+// LookupQuestion represents a lookup query request
+type LookupQuestion struct {
+	// Service is the lookup service identifier (e.g., "ls_ship")
+	Service string `json:"service"`
+	// Query can be a string (e.g., "findAll") or an object with query parameters
+	Query interface{} `json:"query"`
+}
+
+// LookupFormula represents the result of a lookup operation
+// It's an alias for a slice of UTXO references
+type LookupFormula []UTXOReference
+
+// MetaData represents metadata information for a lookup service
+type MetaData struct {
+	// Name is the service name
+	Name string `json:"name"`
+	// ShortDescription is a brief description of the service
+	ShortDescription string `json:"shortDescription"`
+	// IconURL is an optional URL to the service icon
+	IconURL *string `json:"iconURL,omitempty"`
+	// Version is an optional version string
+	Version *string `json:"version,omitempty"`
+	// InformationURL is an optional URL for more information
+	InformationURL *string `json:"informationURL,omitempty"`
+}
+
+// LookupService interface defines the methods that must be implemented by lookup services
+type LookupService interface {
+	// OutputAdmittedByTopic handles an output being admitted by topic
+	OutputAdmittedByTopic(payload OutputAdmittedByTopic) error
+	// OutputSpent handles an output being spent
+	OutputSpent(payload OutputSpent) error
+	// OutputEvicted handles an output being evicted
+	OutputEvicted(txid string, outputIndex int) error
+	// Lookup performs a lookup query and returns matching results
+	Lookup(question LookupQuestion) (LookupFormula, error)
+	// GetDocumentation returns the service documentation
+	GetDocumentation() (string, error)
+	// GetMetaData returns the service metadata
+	GetMetaData() (MetaData, error)
+}
+
+// PushDrop Types and Interfaces
+// These types define the interface for PushDrop decoding functionality.
+
+// Script represents a locking script that can be decoded
+type Script []byte
+
+// PushDropResult represents the result of decoding a PushDrop locking script
+type PushDropResult struct {
+	// Fields contains the decoded fields from the PushDrop script
+	Fields [][]byte `json:"fields"`
+}
+
+// PushDropDecoder interface defines the methods for decoding PushDrop locking scripts
+type PushDropDecoder interface {
+	// Decode decodes a PushDrop locking script and returns the fields
+	Decode(lockingScript string) (*PushDropResult, error)
+}
+
+// Utils interface defines utility methods for working with decoded data
+type Utils interface {
+	// ToUTF8 converts a byte array to a UTF-8 string
+	ToUTF8(data []byte) string
+	// ToHex converts a byte array to a hexadecimal string
+	ToHex(data []byte) string
+}

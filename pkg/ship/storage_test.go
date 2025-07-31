@@ -68,15 +68,15 @@ func (s *TestSHIPStorage) DeleteSHIPRecord(ctx context.Context, txid string, out
 // FindRecord mock implementation
 func (s *TestSHIPStorage) FindRecord(ctx context.Context, query types.SHIPQuery) ([]types.UTXOReference, error) {
 	var results []types.UTXOReference
-	
+
 	for _, record := range s.records {
 		match := true
-		
+
 		// Filter by domain
 		if query.Domain != nil && record.Domain != *query.Domain {
 			match = false
 		}
-		
+
 		// Filter by topics
 		if len(query.Topics) > 0 {
 			topicMatch := false
@@ -90,12 +90,12 @@ func (s *TestSHIPStorage) FindRecord(ctx context.Context, query types.SHIPQuery)
 				match = false
 			}
 		}
-		
+
 		// Filter by identity key
 		if query.IdentityKey != nil && record.IdentityKey != *query.IdentityKey {
 			match = false
 		}
-		
+
 		if match {
 			results = append(results, types.UTXOReference{
 				Txid:        record.Txid,
@@ -103,7 +103,7 @@ func (s *TestSHIPStorage) FindRecord(ctx context.Context, query types.SHIPQuery)
 			})
 		}
 	}
-	
+
 	// Apply pagination
 	if query.Skip != nil && *query.Skip > 0 {
 		if *query.Skip >= len(results) {
@@ -111,25 +111,25 @@ func (s *TestSHIPStorage) FindRecord(ctx context.Context, query types.SHIPQuery)
 		}
 		results = results[*query.Skip:]
 	}
-	
+
 	if query.Limit != nil && *query.Limit > 0 && len(results) > *query.Limit {
 		results = results[:*query.Limit]
 	}
-	
+
 	return results, nil
 }
 
 // FindAll mock implementation
 func (s *TestSHIPStorage) FindAll(ctx context.Context, limit, skip *int, sortOrder *types.SortOrder) ([]types.UTXOReference, error) {
 	var results []types.UTXOReference
-	
+
 	for _, record := range s.records {
 		results = append(results, types.UTXOReference{
 			Txid:        record.Txid,
 			OutputIndex: record.OutputIndex,
 		})
 	}
-	
+
 	// Apply pagination
 	if skip != nil && *skip > 0 {
 		if *skip >= len(results) {
@@ -137,11 +137,11 @@ func (s *TestSHIPStorage) FindAll(ctx context.Context, limit, skip *int, sortOrd
 		}
 		results = results[*skip:]
 	}
-	
+
 	if limit != nil && *limit > 0 && len(results) > *limit {
 		results = results[:*limit]
 	}
-	
+
 	return results, nil
 }
 
@@ -162,10 +162,10 @@ func TestEnsureIndexes(t *testing.T) {
 // TestStoreSHIPRecord tests the record storage functionality
 func TestStoreSHIPRecord(t *testing.T) {
 	storage := NewTestSHIPStorage()
-	
+
 	err := storage.StoreSHIPRecord(context.Background(), "test-txid-123", 0, "test-identity-key", "example.com", "test-topic")
 	assert.NoError(t, err)
-	
+
 	// Verify the record was stored
 	assert.Len(t, storage.records, 1)
 	assert.Equal(t, "test-txid-123", storage.records[0].Txid)
@@ -178,18 +178,18 @@ func TestStoreSHIPRecord(t *testing.T) {
 // TestDeleteSHIPRecord tests the record deletion functionality
 func TestDeleteSHIPRecord(t *testing.T) {
 	storage := NewTestSHIPStorage()
-	
+
 	// Store a record first
 	err := storage.StoreSHIPRecord(context.Background(), "test-txid-123", 0, "test-identity-key", "example.com", "test-topic")
 	require.NoError(t, err)
-	
+
 	// Verify it was stored
 	assert.Len(t, storage.records, 1)
-	
+
 	// Delete the record
 	err = storage.DeleteSHIPRecord(context.Background(), "test-txid-123", 0)
 	assert.NoError(t, err)
-	
+
 	// Verify it was deleted
 	assert.Len(t, storage.records, 0)
 }
@@ -197,7 +197,7 @@ func TestDeleteSHIPRecord(t *testing.T) {
 // TestFindRecord tests the record finding functionality with various query parameters
 func TestFindRecord(t *testing.T) {
 	storage := NewTestSHIPStorage()
-	
+
 	// Store test records
 	records := []struct {
 		txid        string
@@ -211,12 +211,12 @@ func TestFindRecord(t *testing.T) {
 		{"txid3", 0, "key1", "test.com", "topic1"},
 		{"txid4", 2, "key3", "example.com", "topic3"},
 	}
-	
+
 	for _, record := range records {
 		err := storage.StoreSHIPRecord(context.Background(), record.txid, record.outputIndex, record.identityKey, record.domain, record.topic)
 		require.NoError(t, err)
 	}
-	
+
 	tests := []struct {
 		name          string
 		query         types.SHIPQuery
@@ -290,19 +290,19 @@ func TestFindRecord(t *testing.T) {
 			expectedCount: 0,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			results, err := storage.FindRecord(context.Background(), tt.query)
 			assert.NoError(t, err)
 			assert.Len(t, results, tt.expectedCount)
-			
+
 			if len(tt.expectedTxids) > 0 {
 				resultTxids := make([]string, len(results))
 				for i, result := range results {
 					resultTxids[i] = result.Txid
 				}
-				
+
 				for _, expectedTxid := range tt.expectedTxids {
 					assert.Contains(t, resultTxids, expectedTxid)
 				}
@@ -314,14 +314,14 @@ func TestFindRecord(t *testing.T) {
 // TestFindAll tests the find all functionality with pagination
 func TestFindAll(t *testing.T) {
 	storage := NewTestSHIPStorage()
-	
+
 	// Store test records
 	for i := 0; i < 5; i++ {
-		err := storage.StoreSHIPRecord(context.Background(), 
+		err := storage.StoreSHIPRecord(context.Background(),
 			"txid"+string(rune('1'+i)), i, "key"+string(rune('1'+i)), "example.com", "topic1")
 		require.NoError(t, err)
 	}
-	
+
 	tests := []struct {
 		name          string
 		limit         *int
@@ -365,7 +365,7 @@ func TestFindAll(t *testing.T) {
 			expectedCount: 0,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			results, err := storage.FindAll(context.Background(), tt.limit, tt.skip, tt.sortOrder)
@@ -378,18 +378,18 @@ func TestFindAll(t *testing.T) {
 // TestEdgeCases tests various edge cases and error conditions
 func TestEdgeCases(t *testing.T) {
 	storage := NewTestSHIPStorage()
-	
+
 	t.Run("empty query parameters", func(t *testing.T) {
 		results, err := storage.FindRecord(context.Background(), types.SHIPQuery{})
 		assert.NoError(t, err)
 		assert.Empty(t, results)
 	})
-	
+
 	t.Run("delete non-existent record", func(t *testing.T) {
 		err := storage.DeleteSHIPRecord(context.Background(), "non-existent", 0)
 		assert.NoError(t, err) // Should not error even if record doesn't exist
 	})
-	
+
 	t.Run("find with empty topics array", func(t *testing.T) {
 		results, err := storage.FindRecord(context.Background(), types.SHIPQuery{
 			Topics: []string{},
@@ -402,7 +402,7 @@ func TestEdgeCases(t *testing.T) {
 // TestQueryLogicConsistency tests that the query logic matches the TypeScript implementation
 func TestQueryLogicConsistency(t *testing.T) {
 	storage := NewTestSHIPStorage()
-	
+
 	// Store test data
 	testData := []struct {
 		txid        string
@@ -416,13 +416,13 @@ func TestQueryLogicConsistency(t *testing.T) {
 		{"tx3", 0, "alice", "test.com", "payments"},
 		{"tx4", 2, "charlie", "example.com", "storage"},
 	}
-	
+
 	for _, data := range testData {
-		err := storage.StoreSHIPRecord(context.Background(), 
+		err := storage.StoreSHIPRecord(context.Background(),
 			data.txid, data.outputIndex, data.identityKey, data.domain, data.topic)
 		require.NoError(t, err)
 	}
-	
+
 	// Test the exact same query patterns as TypeScript
 	t.Run("domain filter", func(t *testing.T) {
 		results, err := storage.FindRecord(context.Background(), types.SHIPQuery{
@@ -431,7 +431,7 @@ func TestQueryLogicConsistency(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Len(t, results, 3)
 	})
-	
+
 	t.Run("topics filter with $in equivalent", func(t *testing.T) {
 		results, err := storage.FindRecord(context.Background(), types.SHIPQuery{
 			Topics: []string{"payments", "messaging"},
@@ -439,7 +439,7 @@ func TestQueryLogicConsistency(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Len(t, results, 3) // tx1, tx2, tx3
 	})
-	
+
 	t.Run("identity key filter", func(t *testing.T) {
 		results, err := storage.FindRecord(context.Background(), types.SHIPQuery{
 			IdentityKey: stringPtr("alice"),
@@ -447,7 +447,7 @@ func TestQueryLogicConsistency(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Len(t, results, 2) // tx1, tx3
 	})
-	
+
 	t.Run("combined filters", func(t *testing.T) {
 		results, err := storage.FindRecord(context.Background(), types.SHIPQuery{
 			Domain:      stringPtr("example.com"),

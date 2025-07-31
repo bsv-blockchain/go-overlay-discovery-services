@@ -18,10 +18,14 @@ import (
 // SHIPStorage implements a storage engine for SHIP protocol records.
 // It provides MongoDB-based storage with methods for storing, deleting,
 // and querying SHIP records with support for pagination and filtering.
+// SHIPStorage implements the SHIPStorageInterface interface.
 type SHIPStorage struct {
-	db           *mongo.Database
-	shipRecords  *mongo.Collection
+	db          *mongo.Database
+	shipRecords *mongo.Collection
 }
+
+// Note: Compile-time verification that SHIPStorage implements SHIPStorageInterface
+// is performed in lookup_service.go to avoid circular dependencies
 
 // NewSHIPStorage constructs a new SHIPStorage instance with the provided MongoDB database.
 // The storage uses a collection named "shipRecords" to store SHIP protocol records.
