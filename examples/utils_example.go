@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/bsv-blockchain/go-template/pkg/utils"
+	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/utils"
 )
 
 func main() {
-	fmt.Println("=== Overlay Discovery Services Utility Examples ===\n")
+	fmt.Println("=== Overlay Discovery Services Utility Examples ===")
+	fmt.Println()
 
 	// Example 1: URI validation
 	fmt.Println("1. URI Validation Examples:")
