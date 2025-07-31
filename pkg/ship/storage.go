@@ -211,12 +211,12 @@ func (s *SHIPStorage) FindRecord(ctx context.Context, query types.SHIPQuery) ([]
 //   - ctx: Context for the database operation
 //   - limit: Optional limit for pagination (nil for no limit)
 //   - skip: Optional skip for pagination (nil for no skip)
-//   - sortOrder: Optional sort order ("asc" or "desc", nil defaults to "desc")
+//   - sortOrder: Optional sort order (types.SortOrderAsc or types.SortOrderDesc, nil defaults to desc)
 //
 // Returns:
 //   - []types.UTXOReference: All matching UTXO references
 //   - error: An error if the query operation fails, nil otherwise
-func (s *SHIPStorage) FindAll(ctx context.Context, limit, skip *int, sortOrder *string) ([]types.UTXOReference, error) {
+func (s *SHIPStorage) FindAll(ctx context.Context, limit, skip *int, sortOrder *types.SortOrder) ([]types.UTXOReference, error) {
 	// Set up the find options
 	findOpts := options.Find()
 
@@ -229,7 +229,7 @@ func (s *SHIPStorage) FindAll(ctx context.Context, limit, skip *int, sortOrder *
 
 	// Set sort order (default to descending by createdAt)
 	mongoSortOrder := -1 // descending
-	if sortOrder != nil && *sortOrder == "asc" {
+	if sortOrder != nil && *sortOrder == types.SortOrderAsc {
 		mongoSortOrder = 1 // ascending
 	}
 	findOpts.SetSort(bson.M{"createdAt": mongoSortOrder})

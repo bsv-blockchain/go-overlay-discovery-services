@@ -20,7 +20,7 @@ type MockCollection interface {
 	InsertOne(ctx context.Context, document interface{}) error
 	DeleteOne(ctx context.Context, filter interface{}) error
 	Find(ctx context.Context, query types.SHIPQuery) ([]types.UTXOReference, error)
-	FindAll(ctx context.Context, limit, skip *int, sortOrder *string) ([]types.UTXOReference, error)
+	FindAll(ctx context.Context, limit, skip *int, sortOrder *types.SortOrder) ([]types.UTXOReference, error)
 	EnsureIndexes(ctx context.Context) error
 }
 
@@ -120,7 +120,7 @@ func (s *TestSHIPStorage) FindRecord(ctx context.Context, query types.SHIPQuery)
 }
 
 // FindAll mock implementation
-func (s *TestSHIPStorage) FindAll(ctx context.Context, limit, skip *int, sortOrder *string) ([]types.UTXOReference, error) {
+func (s *TestSHIPStorage) FindAll(ctx context.Context, limit, skip *int, sortOrder *types.SortOrder) ([]types.UTXOReference, error) {
 	var results []types.UTXOReference
 	
 	for _, record := range s.records {
@@ -326,7 +326,7 @@ func TestFindAll(t *testing.T) {
 		name          string
 		limit         *int
 		skip          *int
-		sortOrder     *string
+		sortOrder     *types.SortOrder
 		expectedCount int
 	}{
 		{
@@ -351,12 +351,12 @@ func TestFindAll(t *testing.T) {
 		},
 		{
 			name:          "find all with sort order asc",
-			sortOrder:     stringPtr("asc"),
+			sortOrder:     sortOrderPtr(types.SortOrderAsc),
 			expectedCount: 5,
 		},
 		{
 			name:          "find all with sort order desc",
-			sortOrder:     stringPtr("desc"),
+			sortOrder:     sortOrderPtr(types.SortOrderDesc),
 			expectedCount: 5,
 		},
 		{
@@ -467,4 +467,8 @@ func stringPtr(s string) *string {
 
 func intPtr(i int) *int {
 	return &i
+}
+
+func sortOrderPtr(s types.SortOrder) *types.SortOrder {
+	return &s
 }
