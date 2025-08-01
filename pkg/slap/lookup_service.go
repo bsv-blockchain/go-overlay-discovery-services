@@ -182,7 +182,6 @@ func (s *SLAPLookupService) Lookup(ctx context.Context, question types.LookupQue
 		return nil, fmt.Errorf("lookup service not supported: expected '%s', got '%s'", SLAPService, question.Service)
 	}
 
-
 	// Handle legacy "findAll" string query
 	if queryStr, ok := question.Query.(string); ok {
 		if queryStr == "findAll" {

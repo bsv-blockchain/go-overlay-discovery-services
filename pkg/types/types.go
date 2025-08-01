@@ -256,3 +256,28 @@ type Utils interface {
 	// ToHex converts a byte array to a hexadecimal string
 	ToHex(data []byte) string
 }
+
+// Advertiser interface defines the methods that must be implemented by advertisement services.
+// This interface provides functionality for creating, finding, and revoking overlay advertisements.
+type Advertiser interface {
+	// Init initializes the advertiser service and sets up any required resources
+	Init() error
+	// CreateAdvertisements creates new advertisements and returns them as a tagged BEEF
+	CreateAdvertisements(adsData []AdvertisementData) (TaggedBEEF, error)
+	// FindAllAdvertisements finds all advertisements for a given protocol
+	FindAllAdvertisements(protocol string) ([]Advertisement, error)
+	// RevokeAdvertisements revokes existing advertisements and returns the revocation as a tagged BEEF
+	RevokeAdvertisements(advertisements []Advertisement) (TaggedBEEF, error)
+	// ParseAdvertisement parses an output script to extract advertisement information
+	ParseAdvertisement(outputScript Script) (Advertisement, error)
+}
+
+// LookupResolverConfig represents configuration for lookup resolver functionality
+type LookupResolverConfig struct {
+	// HTTPSEndpoint is the HTTPS endpoint for lookup resolution
+	HTTPSEndpoint *string `json:"httpsEndpoint,omitempty"`
+	// MaxRetries is the maximum number of retries for failed lookups
+	MaxRetries *int `json:"maxRetries,omitempty"`
+	// TimeoutMS is the timeout in milliseconds for lookup operations
+	TimeoutMS *int `json:"timeoutMS,omitempty"`
+}
