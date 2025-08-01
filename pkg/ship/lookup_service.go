@@ -81,7 +81,7 @@ func NewSHIPLookupService(storage SHIPStorageInterface, pushDropDecoder types.Pu
 //
 // Returns:
 //   - error: An error if processing fails, nil otherwise
-func (s *SHIPLookupService) OutputAdmittedByTopic(payload types.OutputAdmittedByTopic) error {
+func (s *SHIPLookupService) OutputAdmittedByTopic(ctx context.Context, payload types.OutputAdmittedByTopic) error {
 	// Validate admission mode
 	if payload.Mode != types.AdmissionModeLockingScript {
 		return fmt.Errorf("invalid payload: expected admission mode 'locking-script', got '%s'", payload.Mode)
@@ -114,7 +114,6 @@ func (s *SHIPLookupService) OutputAdmittedByTopic(payload types.OutputAdmittedBy
 	topicSupported := s.utils.ToUTF8(result.Fields[3])
 
 	// Store the SHIP record
-	ctx := context.Background() // TODO: Accept context from caller
 	return s.storage.StoreSHIPRecord(ctx, payload.Txid, payload.OutputIndex, identityKey, domain, topicSupported)
 }
 
@@ -126,7 +125,7 @@ func (s *SHIPLookupService) OutputAdmittedByTopic(payload types.OutputAdmittedBy
 //
 // Returns:
 //   - error: An error if processing fails, nil otherwise
-func (s *SHIPLookupService) OutputSpent(payload types.OutputSpent) error {
+func (s *SHIPLookupService) OutputSpent(ctx context.Context, payload types.OutputSpent) error {
 	// Validate spend notification mode
 	if payload.Mode != types.SpendNotificationModeNone {
 		return fmt.Errorf("invalid payload: expected spend notification mode 'none', got '%s'", payload.Mode)
@@ -138,7 +137,6 @@ func (s *SHIPLookupService) OutputSpent(payload types.OutputSpent) error {
 	}
 
 	// Delete the SHIP record
-	ctx := context.Background() // TODO: Accept context from caller
 	return s.storage.DeleteSHIPRecord(ctx, payload.Txid, payload.OutputIndex)
 }
 
@@ -151,9 +149,8 @@ func (s *SHIPLookupService) OutputSpent(payload types.OutputSpent) error {
 //
 // Returns:
 //   - error: An error if processing fails, nil otherwise
-func (s *SHIPLookupService) OutputEvicted(txid string, outputIndex int) error {
+func (s *SHIPLookupService) OutputEvicted(ctx context.Context, txid string, outputIndex int) error {
 	// Delete the SHIP record
-	ctx := context.Background() // TODO: Accept context from caller
 	return s.storage.DeleteSHIPRecord(ctx, txid, outputIndex)
 }
 
@@ -171,7 +168,7 @@ func (s *SHIPLookupService) OutputEvicted(txid string, outputIndex int) error {
 // Returns:
 //   - types.LookupFormula: Matching UTXO references
 //   - error: An error if the query fails or is invalid, nil otherwise
-func (s *SHIPLookupService) Lookup(question types.LookupQuestion) (types.LookupFormula, error) {
+func (s *SHIPLookupService) Lookup(ctx context.Context, question types.LookupQuestion) (types.LookupFormula, error) {
 	// Validate required fields
 	if question.Query == nil {
 		return nil, fmt.Errorf("a valid query must be provided")
@@ -180,8 +177,6 @@ func (s *SHIPLookupService) Lookup(question types.LookupQuestion) (types.LookupF
 	if question.Service != SHIPService {
 		return nil, fmt.Errorf("lookup service not supported: expected '%s', got '%s'", SHIPService, question.Service)
 	}
-
-	ctx := context.Background() // TODO: Accept context from caller
 
 	// Handle legacy "findAll" string query
 	if queryStr, ok := question.Query.(string); ok {

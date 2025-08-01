@@ -77,11 +77,12 @@ func NewSLAPLookupService(storage SLAPStorageInterface, pushDropDecoder types.Pu
 //   - fields[3]: Service name supported
 //
 // Parameters:
+//   - ctx: Context for request lifecycle management
 //   - payload: The output admission payload containing topic, locking script, and UTXO reference
 //
 // Returns:
 //   - error: An error if processing fails, nil otherwise
-func (s *SLAPLookupService) OutputAdmittedByTopic(payload types.OutputAdmittedByTopic) error {
+func (s *SLAPLookupService) OutputAdmittedByTopic(ctx context.Context, payload types.OutputAdmittedByTopic) error {
 	// Validate admission mode
 	if payload.Mode != types.AdmissionModeLockingScript {
 		return fmt.Errorf("invalid payload: expected admission mode 'locking-script', got '%s'", payload.Mode)
@@ -114,7 +115,6 @@ func (s *SLAPLookupService) OutputAdmittedByTopic(payload types.OutputAdmittedBy
 	serviceSupported := s.utils.ToUTF8(result.Fields[3])
 
 	// Store the SLAP record
-	ctx := context.Background() // TODO: Accept context from caller
 	return s.storage.StoreSLAPRecord(ctx, payload.Txid, payload.OutputIndex, identityKey, domain, serviceSupported)
 }
 
@@ -122,11 +122,12 @@ func (s *SLAPLookupService) OutputAdmittedByTopic(payload types.OutputAdmittedBy
 // This method removes the corresponding SLAP record when the UTXO is spent.
 //
 // Parameters:
+//   - ctx: Context for request lifecycle management
 //   - payload: The spent output payload containing topic and UTXO reference
 //
 // Returns:
 //   - error: An error if processing fails, nil otherwise
-func (s *SLAPLookupService) OutputSpent(payload types.OutputSpent) error {
+func (s *SLAPLookupService) OutputSpent(ctx context.Context, payload types.OutputSpent) error {
 	// Validate spend notification mode
 	if payload.Mode != types.SpendNotificationModeNone {
 		return fmt.Errorf("invalid payload: expected spend notification mode 'none', got '%s'", payload.Mode)
@@ -138,7 +139,6 @@ func (s *SLAPLookupService) OutputSpent(payload types.OutputSpent) error {
 	}
 
 	// Delete the SLAP record
-	ctx := context.Background() // TODO: Accept context from caller
 	return s.storage.DeleteSLAPRecord(ctx, payload.Txid, payload.OutputIndex)
 }
 
@@ -146,14 +146,14 @@ func (s *SLAPLookupService) OutputSpent(payload types.OutputSpent) error {
 // This method removes the corresponding SLAP record when the UTXO is evicted from the mempool.
 //
 // Parameters:
+//   - ctx: Context for request lifecycle management
 //   - txid: The transaction ID of the evicted output
 //   - outputIndex: The index of the evicted output within the transaction
 //
 // Returns:
 //   - error: An error if processing fails, nil otherwise
-func (s *SLAPLookupService) OutputEvicted(txid string, outputIndex int) error {
+func (s *SLAPLookupService) OutputEvicted(ctx context.Context, txid string, outputIndex int) error {
 	// Delete the SLAP record
-	ctx := context.Background() // TODO: Accept context from caller
 	return s.storage.DeleteSLAPRecord(ctx, txid, outputIndex)
 }
 
@@ -166,12 +166,13 @@ func (s *SLAPLookupService) OutputEvicted(txid string, outputIndex int) error {
 //   - Object with SLAPQuery fields: Filters by domain, service, identityKey with pagination
 //
 // Parameters:
+//   - ctx: Context for request lifecycle management
 //   - question: The lookup question containing service identifier and query parameters
 //
 // Returns:
 //   - types.LookupFormula: Matching UTXO references
 //   - error: An error if the query fails or is invalid, nil otherwise
-func (s *SLAPLookupService) Lookup(question types.LookupQuestion) (types.LookupFormula, error) {
+func (s *SLAPLookupService) Lookup(ctx context.Context, question types.LookupQuestion) (types.LookupFormula, error) {
 	// Validate required fields
 	if question.Query == nil {
 		return nil, fmt.Errorf("a valid query must be provided")
@@ -181,7 +182,6 @@ func (s *SLAPLookupService) Lookup(question types.LookupQuestion) (types.LookupF
 		return nil, fmt.Errorf("lookup service not supported: expected '%s', got '%s'", SLAPService, question.Service)
 	}
 
-	ctx := context.Background() // TODO: Accept context from caller
 
 	// Handle legacy "findAll" string query
 	if queryStr, ok := question.Query.(string); ok {

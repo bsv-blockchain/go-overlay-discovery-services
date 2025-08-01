@@ -66,7 +66,7 @@ func ExampleUsage() {
 		OutputIndex:   0,
 	}
 
-	if err := lookupService.OutputAdmittedByTopic(admissionPayload); err != nil {
+	if err := lookupService.OutputAdmittedByTopic(ctx, admissionPayload); err != nil {
 		log.Printf("Failed to handle admitted output: %v", err)
 	} else {
 		fmt.Println("Successfully processed SHIP advertisement")
@@ -80,7 +80,7 @@ func ExampleUsage() {
 		Query:   "findAll",
 	}
 
-	results, err := lookupService.Lookup(legacyQuestion)
+	results, err := lookupService.Lookup(ctx, legacyQuestion)
 	if err != nil {
 		log.Printf("Legacy lookup failed: %v", err)
 	} else {
@@ -100,7 +100,7 @@ func ExampleUsage() {
 		Query:   modernQuery,
 	}
 
-	results, err = lookupService.Lookup(modernQuestion)
+	results, err = lookupService.Lookup(ctx, modernQuestion)
 	if err != nil {
 		log.Printf("Modern lookup failed: %v", err)
 	} else {
@@ -133,7 +133,7 @@ func ExampleUsage() {
 		OutputIndex: 0,
 	}
 
-	if err := lookupService.OutputSpent(spentPayload); err != nil {
+	if err := lookupService.OutputSpent(ctx, spentPayload); err != nil {
 		log.Printf("Failed to handle spent output: %v", err)
 	} else {
 		fmt.Println("Successfully processed spent SHIP output")

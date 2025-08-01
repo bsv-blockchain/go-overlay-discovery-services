@@ -132,7 +132,7 @@ func TestOutputAdmittedByTopic_Success(t *testing.T) {
 	mockStorage.On("StoreSHIPRecord", mock.Anything, "abc123", 0, "01020304", "https://example.com", "tm_bridge").Return(nil)
 
 	// Execute
-	err := service.OutputAdmittedByTopic(payload)
+	err := service.OutputAdmittedByTopic(context.Background(), payload)
 
 	// Assert
 	assert.NoError(t, err)
@@ -152,7 +152,7 @@ func TestOutputAdmittedByTopic_InvalidMode(t *testing.T) {
 		OutputIndex:   0,
 	}
 
-	err := service.OutputAdmittedByTopic(payload)
+	err := service.OutputAdmittedByTopic(context.Background(), payload)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid payload: expected admission mode 'locking-script'")
 }
@@ -168,7 +168,7 @@ func TestOutputAdmittedByTopic_IgnoreNonSHIPTopic(t *testing.T) {
 		OutputIndex:   0,
 	}
 
-	err := service.OutputAdmittedByTopic(payload)
+	err := service.OutputAdmittedByTopic(context.Background(), payload)
 	assert.NoError(t, err) // Should silently ignore non-SHIP topics
 }
 
@@ -185,7 +185,7 @@ func TestOutputAdmittedByTopic_PushDropDecodeError(t *testing.T) {
 
 	mockPushDrop.On("Decode", "deadbeef").Return(nil, errors.New("decode error"))
 
-	err := service.OutputAdmittedByTopic(payload)
+	err := service.OutputAdmittedByTopic(context.Background(), payload)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to decode PushDrop locking script")
 }
@@ -211,7 +211,7 @@ func TestOutputAdmittedByTopic_InsufficientFields(t *testing.T) {
 
 	mockPushDrop.On("Decode", "deadbeef").Return(pushDropResult, nil)
 
-	err := service.OutputAdmittedByTopic(payload)
+	err := service.OutputAdmittedByTopic(context.Background(), payload)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "expected at least 4 fields, got 2")
 }
@@ -233,7 +233,7 @@ func TestOutputAdmittedByTopic_IgnoreNonSHIPProtocol(t *testing.T) {
 	mockPushDrop.On("Decode", "deadbeef").Return(pushDropResult, nil)
 	mockUtils.On("ToUTF8", []byte("SLAP")).Return("SLAP")
 
-	err := service.OutputAdmittedByTopic(payload)
+	err := service.OutputAdmittedByTopic(context.Background(), payload)
 	assert.NoError(t, err) // Should silently ignore non-SHIP protocols
 }
 
@@ -251,7 +251,7 @@ func TestOutputSpent_Success(t *testing.T) {
 
 	mockStorage.On("DeleteSHIPRecord", mock.Anything, "abc123", 0).Return(nil)
 
-	err := service.OutputSpent(payload)
+	err := service.OutputSpent(context.Background(), payload)
 	assert.NoError(t, err)
 	mockStorage.AssertExpectations(t)
 }
@@ -266,7 +266,7 @@ func TestOutputSpent_InvalidMode(t *testing.T) {
 		OutputIndex: 0,
 	}
 
-	err := service.OutputSpent(payload)
+	err := service.OutputSpent(context.Background(), payload)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid payload: expected spend notification mode 'none'")
 }
@@ -281,7 +281,7 @@ func TestOutputSpent_IgnoreNonSHIPTopic(t *testing.T) {
 		OutputIndex: 0,
 	}
 
-	err := service.OutputSpent(payload)
+	err := service.OutputSpent(context.Background(), payload)
 	assert.NoError(t, err) // Should silently ignore non-SHIP topics
 }
 
@@ -292,7 +292,7 @@ func TestOutputEvicted_Success(t *testing.T) {
 
 	mockStorage.On("DeleteSHIPRecord", mock.Anything, "abc123", 0).Return(nil)
 
-	err := service.OutputEvicted("abc123", 0)
+	err := service.OutputEvicted(context.Background(), "abc123", 0)
 	assert.NoError(t, err)
 	mockStorage.AssertExpectations(t)
 }
@@ -302,7 +302,7 @@ func TestOutputEvicted_StorageError(t *testing.T) {
 
 	mockStorage.On("DeleteSHIPRecord", mock.Anything, "abc123", 0).Return(errors.New("storage error"))
 
-	err := service.OutputEvicted("abc123", 0)
+	err := service.OutputEvicted(context.Background(), "abc123", 0)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "storage error")
 }
@@ -324,7 +324,7 @@ func TestLookup_LegacyFindAll(t *testing.T) {
 
 	mockStorage.On("FindAll", mock.Anything, (*int)(nil), (*int)(nil), (*types.SortOrder)(nil)).Return(expectedResults, nil)
 
-	results, err := service.Lookup(question)
+	results, err := service.Lookup(context.Background(), question)
 	assert.NoError(t, err)
 	assert.Equal(t, types.LookupFormula(expectedResults), results)
 	mockStorage.AssertExpectations(t)
@@ -338,7 +338,7 @@ func TestLookup_NilQuery(t *testing.T) {
 		Query:   nil,
 	}
 
-	_, err := service.Lookup(question)
+	_, err := service.Lookup(context.Background(), question)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "a valid query must be provided")
 }
@@ -351,7 +351,7 @@ func TestLookup_WrongService(t *testing.T) {
 		Query:   "findAll",
 	}
 
-	_, err := service.Lookup(question)
+	_, err := service.Lookup(context.Background(), question)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "lookup service not supported")
 }
@@ -364,7 +364,7 @@ func TestLookup_InvalidStringQuery(t *testing.T) {
 		Query:   "invalid",
 	}
 
-	_, err := service.Lookup(question)
+	_, err := service.Lookup(context.Background(), question)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid string query: only 'findAll' is supported")
 }
@@ -395,7 +395,7 @@ func TestLookup_ObjectQuery_FindAll(t *testing.T) {
 
 	mockStorage.On("FindAll", mock.Anything, &limit, &skip, &sortOrder).Return(expectedResults, nil)
 
-	results, err := service.Lookup(question)
+	results, err := service.Lookup(context.Background(), question)
 	assert.NoError(t, err)
 	assert.Equal(t, types.LookupFormula(expectedResults), results)
 	mockStorage.AssertExpectations(t)
@@ -431,7 +431,7 @@ func TestLookup_ObjectQuery_SpecificQuery(t *testing.T) {
 
 	mockStorage.On("FindRecord", mock.Anything, expectedQuery).Return(expectedResults, nil)
 
-	results, err := service.Lookup(question)
+	results, err := service.Lookup(context.Background(), question)
 	assert.NoError(t, err)
 	assert.Equal(t, types.LookupFormula(expectedResults), results)
 	mockStorage.AssertExpectations(t)
@@ -449,7 +449,7 @@ func TestLookup_ValidationError_NegativeLimit(t *testing.T) {
 		Query:   query,
 	}
 
-	_, err := service.Lookup(question)
+	_, err := service.Lookup(context.Background(), question)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "query.limit must be a positive number")
 }
@@ -466,7 +466,7 @@ func TestLookup_ValidationError_NegativeSkip(t *testing.T) {
 		Query:   query,
 	}
 
-	_, err := service.Lookup(question)
+	_, err := service.Lookup(context.Background(), question)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "query.skip must be a non-negative number")
 }
@@ -483,7 +483,7 @@ func TestLookup_ValidationError_InvalidSortOrder(t *testing.T) {
 		Query:   query,
 	}
 
-	_, err := service.Lookup(question)
+	_, err := service.Lookup(context.Background(), question)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "query.sortOrder must be 'asc' or 'desc'")
 }
@@ -526,7 +526,7 @@ func TestLookup_StorageError(t *testing.T) {
 
 	mockStorage.On("FindAll", mock.Anything, (*int)(nil), (*int)(nil), (*types.SortOrder)(nil)).Return([]types.UTXOReference{}, errors.New("storage error"))
 
-	_, err := service.Lookup(question)
+	_, err := service.Lookup(context.Background(), question)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "storage error")
 }
@@ -551,7 +551,7 @@ func TestOutputAdmittedByTopic_StorageError(t *testing.T) {
 	mockUtils.On("ToUTF8", []byte("tm_bridge")).Return("tm_bridge")
 	mockStorage.On("StoreSHIPRecord", mock.Anything, "abc123", 0, "01020304", "https://example.com", "tm_bridge").Return(errors.New("storage error"))
 
-	err := service.OutputAdmittedByTopic(payload)
+	err := service.OutputAdmittedByTopic(context.Background(), payload)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "storage error")
 }
@@ -598,7 +598,7 @@ func TestLookup_ComplexObjectQuery(t *testing.T) {
 
 	mockStorage.On("FindRecord", mock.Anything, expectedQuery).Return(expectedResults, nil)
 
-	results, err := service.Lookup(question)
+	results, err := service.Lookup(context.Background(), question)
 	assert.NoError(t, err)
 	assert.Equal(t, types.LookupFormula(expectedResults), results)
 	assert.Len(t, results, 2)

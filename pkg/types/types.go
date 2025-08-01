@@ -4,6 +4,7 @@
 package types
 
 import (
+	"context"
 	"time"
 )
 
@@ -217,13 +218,13 @@ type MetaData struct {
 // LookupService interface defines the methods that must be implemented by lookup services
 type LookupService interface {
 	// OutputAdmittedByTopic handles an output being admitted by topic
-	OutputAdmittedByTopic(payload OutputAdmittedByTopic) error
+	OutputAdmittedByTopic(ctx context.Context, payload OutputAdmittedByTopic) error
 	// OutputSpent handles an output being spent
-	OutputSpent(payload OutputSpent) error
+	OutputSpent(ctx context.Context, payload OutputSpent) error
 	// OutputEvicted handles an output being evicted
-	OutputEvicted(txid string, outputIndex int) error
+	OutputEvicted(ctx context.Context, txid string, outputIndex int) error
 	// Lookup performs a lookup query and returns matching results
-	Lookup(question LookupQuestion) (LookupFormula, error)
+	Lookup(ctx context.Context, question LookupQuestion) (LookupFormula, error)
 	// GetDocumentation returns the service documentation
 	GetDocumentation() (string, error)
 	// GetMetaData returns the service metadata
