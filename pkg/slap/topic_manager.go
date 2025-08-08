@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
+	"github.com/bsv-blockchain/go-sdk/overlay"
+	"github.com/bsv-blockchain/go-sdk/transaction"
 )
 
 // ServiceSubscription represents an active service subscription for SLAP protocol
@@ -457,4 +459,36 @@ func (tm *SLAPTopicManager) GetAvailableServices() []string {
 	}
 
 	return services
+}
+// IdentifyAdmissibleOutputs implements the engine.TopicManager interface
+// For SLAP, this identifies outputs that should be admitted to the overlay
+func (tm *SLAPTopicManager) IdentifyAdmissibleOutputs(ctx context.Context, beef []byte, previousCoins map[uint32]*transaction.TransactionOutput) (overlay.AdmittanceInstructions, error) {
+	// SLAP topic manager doesn't admit outputs directly - it manages service lookup
+	// Return empty admissible list
+	return overlay.AdmittanceInstructions{
+		OutputsToAdmit: []uint32{},
+	}, nil
+}
+
+// IdentifyNeededInputs implements the engine.TopicManager interface
+// For SLAP, this identifies inputs needed for validation
+func (tm *SLAPTopicManager) IdentifyNeededInputs(ctx context.Context, beef []byte) ([]*transaction.Outpoint, error) {
+	// SLAP doesn't require specific inputs for validation
+	return []*transaction.Outpoint{}, nil
+}
+
+// GetDocumentation implements the engine.TopicManager interface
+// Returns documentation for the SLAP topic manager
+func (tm *SLAPTopicManager) GetDocumentation() string {
+	return "SLAP (Service Lookup Availability Protocol) topic manager for overlay network services. " +
+		"SLAP enables service lookup and availability tracking across overlay nodes."
+}
+
+// GetMetaData implements the engine.TopicManager interface
+// Returns metadata about the SLAP topic manager
+func (tm *SLAPTopicManager) GetMetaData() *overlay.MetaData {
+	return &overlay.MetaData{
+		Name:        "SLAP Topic Manager",
+		Description: "Manages SLAP protocol topics for service lookup and availability tracking",
+	}
 }

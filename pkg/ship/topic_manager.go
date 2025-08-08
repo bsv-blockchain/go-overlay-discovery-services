@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
+	"github.com/bsv-blockchain/go-sdk/overlay"
+	"github.com/bsv-blockchain/go-sdk/transaction"
 )
 
 // TopicSubscription represents an active topic subscription
@@ -369,4 +371,37 @@ func (tm *SHIPTopicManager) GetTotalMessageCount() int64 {
 		total += subscription.MessageCount
 	}
 	return total
+}
+
+// IdentifyAdmissibleOutputs implements the engine.TopicManager interface
+// For SHIP, this identifies outputs that should be admitted to the overlay
+func (tm *SHIPTopicManager) IdentifyAdmissibleOutputs(ctx context.Context, beef []byte, previousCoins map[uint32]*transaction.TransactionOutput) (overlay.AdmittanceInstructions, error) {
+	// SHIP topic manager doesn't admit outputs directly - it manages service discovery
+	// Return empty admissible list
+	return overlay.AdmittanceInstructions{
+		OutputsToAdmit: []uint32{},
+	}, nil
+}
+
+// IdentifyNeededInputs implements the engine.TopicManager interface
+// For SHIP, this identifies inputs needed for validation
+func (tm *SHIPTopicManager) IdentifyNeededInputs(ctx context.Context, beef []byte) ([]*transaction.Outpoint, error) {
+	// SHIP doesn't require specific inputs for validation
+	return []*transaction.Outpoint{}, nil
+}
+
+// GetDocumentation implements the engine.TopicManager interface
+// Returns documentation for the SHIP topic manager
+func (tm *SHIPTopicManager) GetDocumentation() string {
+	return "SHIP (Service Host Interconnect Protocol) topic manager for overlay network services. " +
+		"SHIP enables service discovery and interconnection between overlay nodes."
+}
+
+// GetMetaData implements the engine.TopicManager interface
+// Returns metadata about the SHIP topic manager
+func (tm *SHIPTopicManager) GetMetaData() *overlay.MetaData {
+	return &overlay.MetaData{
+		Name:        "SHIP Topic Manager",
+		Description: "Manages SHIP protocol topics for service host interconnection and discovery",
+	}
 }
