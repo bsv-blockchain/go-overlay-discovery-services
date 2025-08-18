@@ -22,10 +22,8 @@ func createTestSLAPTopicManager() (*SLAPTopicManager, *MockSLAPStorageInterface)
 
 func createTestSLAPTopicManagerWithLookupService() (*SLAPTopicManager, *MockSLAPStorageInterface, *SLAPLookupService) {
 	mockStorage := new(MockSLAPStorageInterface)
-	mockPushDrop := new(TestMockPushDropDecoder)
-	mockUtils := new(TestMockUtils)
 
-	lookupService := NewSLAPLookupService(mockStorage, mockPushDrop, mockUtils)
+	lookupService := NewSLAPLookupService(mockStorage)
 	topicManager := NewSLAPTopicManager(mockStorage, lookupService)
 
 	return topicManager, mockStorage, lookupService

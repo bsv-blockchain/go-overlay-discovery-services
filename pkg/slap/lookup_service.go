@@ -5,11 +5,14 @@ package slap
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"reflect"
 
 	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
+	"github.com/bsv-blockchain/go-sdk/script"
+	"github.com/bsv-blockchain/go-sdk/transaction/template/pushdrop"
 )
 
 // Constants for SLAP service configuration
@@ -37,10 +40,6 @@ type SLAPStorageInterface interface {
 type SLAPLookupService struct {
 	// storage is the SLAP storage implementation
 	storage SLAPStorageInterface
-	// pushDropDecoder handles PushDrop locking script decoding
-	pushDropDecoder types.PushDropDecoder
-	// utils provides utility functions for data conversion
-	utils types.Utils
 }
 
 // Compile-time verification that SLAPLookupService implements types.LookupService
@@ -53,16 +52,12 @@ var _ SLAPStorageInterface = (*SLAPStorage)(nil)
 //
 // Parameters:
 //   - storage: The SLAP storage implementation for data persistence
-//   - pushDropDecoder: The PushDrop decoder for parsing locking scripts
-//   - utils: Utility functions for data conversion
 //
 // Returns:
 //   - *SLAPLookupService: A new SLAP lookup service instance
-func NewSLAPLookupService(storage SLAPStorageInterface, pushDropDecoder types.PushDropDecoder, utils types.Utils) *SLAPLookupService {
+func NewSLAPLookupService(storage SLAPStorageInterface) *SLAPLookupService {
 	return &SLAPLookupService{
-		storage:         storage,
-		pushDropDecoder: pushDropDecoder,
-		utils:           utils,
+		storage: storage,
 	}
 }
 
@@ -77,7 +72,6 @@ func NewSLAPLookupService(storage SLAPStorageInterface, pushDropDecoder types.Pu
 //   - fields[3]: Service name supported
 //
 // Parameters:
-//   - ctx: Context for request lifecycle management
 //   - payload: The output admission payload containing topic, locking script, and UTXO reference
 //
 // Returns:
@@ -93,10 +87,16 @@ func (s *SLAPLookupService) OutputAdmittedByTopic(ctx context.Context, payload t
 		return nil // Silently ignore non-SLAP topics
 	}
 
-	// Decode the PushDrop locking script
-	result, err := s.pushDropDecoder.Decode(payload.LockingScript)
+	// Create script from hex string
+	scriptObj, err := script.NewFromHex(payload.LockingScript)
 	if err != nil {
-		return fmt.Errorf("failed to decode PushDrop locking script: %w", err)
+		return fmt.Errorf("failed to create script from hex: %w", err)
+	}
+
+	// Decode the PushDrop locking script
+	result := pushdrop.Decode(scriptObj)
+	if result == nil {
+		return fmt.Errorf("failed to decode PushDrop locking script")
 	}
 
 	// Validate that we have the expected number of fields
@@ -105,14 +105,14 @@ func (s *SLAPLookupService) OutputAdmittedByTopic(ctx context.Context, payload t
 	}
 
 	// Extract and validate fields
-	slapIdentifier := s.utils.ToUTF8(result.Fields[0])
+	slapIdentifier := string(result.Fields[0])
 	if slapIdentifier != SLAPIdentifier {
 		return nil // Silently ignore non-SLAP protocols
 	}
 
-	identityKey := s.utils.ToHex(result.Fields[1])
-	domain := s.utils.ToUTF8(result.Fields[2])
-	serviceSupported := s.utils.ToUTF8(result.Fields[3])
+	identityKey := hex.EncodeToString(result.Fields[1])
+	domain := string(result.Fields[2])
+	serviceSupported := string(result.Fields[3])
 
 	// Store the SLAP record
 	return s.storage.StoreSLAPRecord(ctx, payload.Txid, payload.OutputIndex, identityKey, domain, serviceSupported)
@@ -122,7 +122,6 @@ func (s *SLAPLookupService) OutputAdmittedByTopic(ctx context.Context, payload t
 // This method removes the corresponding SLAP record when the UTXO is spent.
 //
 // Parameters:
-//   - ctx: Context for request lifecycle management
 //   - payload: The spent output payload containing topic and UTXO reference
 //
 // Returns:
@@ -146,7 +145,6 @@ func (s *SLAPLookupService) OutputSpent(ctx context.Context, payload types.Outpu
 // This method removes the corresponding SLAP record when the UTXO is evicted from the mempool.
 //
 // Parameters:
-//   - ctx: Context for request lifecycle management
 //   - txid: The transaction ID of the evicted output
 //   - outputIndex: The index of the evicted output within the transaction
 //
@@ -166,7 +164,6 @@ func (s *SLAPLookupService) OutputEvicted(ctx context.Context, txid string, outp
 //   - Object with SLAPQuery fields: Filters by domain, service, identityKey with pagination
 //
 // Parameters:
-//   - ctx: Context for request lifecycle management
 //   - question: The lookup question containing service identifier and query parameters
 //
 // Returns:
