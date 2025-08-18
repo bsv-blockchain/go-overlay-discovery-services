@@ -3,14 +3,22 @@ package ship
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"testing"
 
 	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
+	"github.com/bsv-blockchain/go-overlay-services/pkg/core/engine"
+	"github.com/bsv-blockchain/go-sdk/chainhash"
+	"github.com/bsv-blockchain/go-sdk/overlay/lookup"
 	"github.com/bsv-blockchain/go-sdk/script"
+	"github.com/bsv-blockchain/go-sdk/transaction"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
+
+const TxId = "bdf1e48e845a65ba8c139c9b94844de30716f38d53787ba0a435e8705c4216d5"
 
 // Mock implementations for testing
 
@@ -112,70 +120,91 @@ func TestOutputAdmittedByTopic_Success(t *testing.T) {
 		[]byte("https://example.com"),  // Domain
 		[]byte("tm_bridge"),            // Topic
 	}
-	validScript := createValidPushDropScript(fields)
+	validScriptHex := createValidPushDropScript(fields)
+	scriptObj, err := script.NewFromHex(validScriptHex)
+	require.NoError(t, err)
 
-	payload := types.OutputAdmittedByTopic{
-		Mode:          types.AdmissionModeLockingScript,
-		Topic:         SHIPTopic,
-		LockingScript: validScript,
-		Txid:          "abc123",
-		OutputIndex:   0,
+	// Create outpoint
+	txidBytes, err := hex.DecodeString(TxId)
+	require.NoError(t, err)
+	var txidArray [32]byte
+	copy(txidArray[:], txidBytes)
+
+	outpoint := &transaction.Outpoint{
+		Txid:  txidArray,
+		Index: 0,
 	}
 
-	// Set up mock for storage
-	mockStorage.On("StoreSHIPRecord", mock.Anything, "abc123", 0, "01020304", "https://example.com", "tm_bridge").Return(nil)
+	payload := &engine.OutputAdmittedByTopic{
+		Topic:         SHIPTopic,
+		Outpoint:      outpoint,
+		LockingScript: scriptObj,
+	}
+
+	// Set up mock for storage (txid is now hex-encoded from outpoint)
+	mockStorage.On("StoreSHIPRecord", mock.Anything, TxId, 0, "01020304", "https://example.com", "tm_bridge").Return(nil)
 
 	// Execute
-	err := service.OutputAdmittedByTopic(context.Background(), payload)
+	err = service.OutputAdmittedByTopic(context.Background(), payload)
 
 	// Assert
 	assert.NoError(t, err)
 	mockStorage.AssertExpectations(t)
 }
 
-func TestOutputAdmittedByTopic_InvalidMode(t *testing.T) {
-	service, _ := createTestSHIPLookupService()
-
-	payload := types.OutputAdmittedByTopic{
-		Mode:          "invalid-mode",
-		Topic:         SHIPTopic,
-		LockingScript: "deadbeef",
-		Txid:          "abc123",
-		OutputIndex:   0,
-	}
-
-	err := service.OutputAdmittedByTopic(context.Background(), payload)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid payload: expected admission mode 'locking-script'")
-}
-
 func TestOutputAdmittedByTopic_IgnoreNonSHIPTopic(t *testing.T) {
 	service, _ := createTestSHIPLookupService()
 
-	payload := types.OutputAdmittedByTopic{
-		Mode:          types.AdmissionModeLockingScript,
-		Topic:         "tm_other",
-		LockingScript: "deadbeef",
-		Txid:          "abc123",
-		OutputIndex:   0,
+	// Create invalid script that can't be decoded
+	scriptObj, err := script.NewFromHex("deadbeef")
+	require.NoError(t, err)
+
+	// Create outpoint
+	txidBytes, err := hex.DecodeString(TxId)
+	require.NoError(t, err)
+	var txidArray [32]byte
+	copy(txidArray[:], txidBytes)
+
+	outpoint := &transaction.Outpoint{
+		Txid:  txidArray,
+		Index: 0,
 	}
 
-	err := service.OutputAdmittedByTopic(context.Background(), payload)
+	payload := &engine.OutputAdmittedByTopic{
+		Topic:         "tm_other",
+		Outpoint:      outpoint,
+		LockingScript: scriptObj,
+	}
+
+	err = service.OutputAdmittedByTopic(context.Background(), payload)
 	assert.NoError(t, err) // Should silently ignore non-SHIP topics
 }
 
 func TestOutputAdmittedByTopic_PushDropDecodeError(t *testing.T) {
 	service, _ := createTestSHIPLookupService()
 
-	payload := types.OutputAdmittedByTopic{
-		Mode:          types.AdmissionModeLockingScript,
-		Topic:         SHIPTopic,
-		LockingScript: "deadbeef", // Invalid script that can't be decoded
-		Txid:          "abc123",
-		OutputIndex:   0,
+	// Create invalid script that can't be decoded
+	scriptObj, err := script.NewFromHex("deadbeef")
+	require.NoError(t, err)
+
+	// Create outpoint
+	txidBytes, err := hex.DecodeString(TxId)
+	require.NoError(t, err)
+	var txidArray [32]byte
+	copy(txidArray[:], txidBytes)
+
+	outpoint := &transaction.Outpoint{
+		Txid:  txidArray,
+		Index: 0,
 	}
 
-	err := service.OutputAdmittedByTopic(context.Background(), payload)
+	payload := &engine.OutputAdmittedByTopic{
+		Topic:         SHIPTopic,
+		Outpoint:      outpoint,
+		LockingScript: scriptObj,
+	}
+
+	err = service.OutputAdmittedByTopic(context.Background(), payload)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to decode PushDrop locking script")
 }
@@ -188,17 +217,28 @@ func TestOutputAdmittedByTopic_InsufficientFields(t *testing.T) {
 		[]byte("SHIP"),
 		[]byte{0x01, 0x02, 0x03, 0x04},
 	}
-	invalidScript := createValidPushDropScript(fields)
+	invalidScriptHex := createValidPushDropScript(fields)
+	scriptObj, err := script.NewFromHex(invalidScriptHex)
+	require.NoError(t, err)
 
-	payload := types.OutputAdmittedByTopic{
-		Mode:          types.AdmissionModeLockingScript,
-		Topic:         SHIPTopic,
-		LockingScript: invalidScript,
-		Txid:          "abc123",
-		OutputIndex:   0,
+	// Create outpoint
+	txidBytes, err := hex.DecodeString(TxId)
+	require.NoError(t, err)
+	var txidArray [32]byte
+	copy(txidArray[:], txidBytes)
+
+	outpoint := &transaction.Outpoint{
+		Txid:  txidArray,
+		Index: 0,
 	}
 
-	err := service.OutputAdmittedByTopic(context.Background(), payload)
+	payload := &engine.OutputAdmittedByTopic{
+		Topic:         SHIPTopic,
+		Outpoint:      outpoint,
+		LockingScript: scriptObj,
+	}
+
+	err = service.OutputAdmittedByTopic(context.Background(), payload)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "expected at least 4 fields, got 2")
 }
@@ -213,17 +253,28 @@ func TestOutputAdmittedByTopic_IgnoreNonSHIPProtocol(t *testing.T) {
 		[]byte("https://example.com"),  // Domain
 		[]byte("tm_bridge"),            // Topic
 	}
-	validScript := createValidPushDropScript(fields)
+	validScriptHex := createValidPushDropScript(fields)
+	scriptObj, err := script.NewFromHex(validScriptHex)
+	require.NoError(t, err)
 
-	payload := types.OutputAdmittedByTopic{
-		Mode:          types.AdmissionModeLockingScript,
-		Topic:         SHIPTopic,
-		LockingScript: validScript,
-		Txid:          "abc123",
-		OutputIndex:   0,
+	// Create outpoint
+	txidBytes, err := hex.DecodeString(TxId)
+	require.NoError(t, err)
+	var txidArray [32]byte
+	copy(txidArray[:], txidBytes)
+
+	outpoint := &transaction.Outpoint{
+		Txid:  txidArray,
+		Index: 0,
 	}
 
-	err := service.OutputAdmittedByTopic(context.Background(), payload)
+	payload := &engine.OutputAdmittedByTopic{
+		Topic:         SHIPTopic,
+		Outpoint:      outpoint,
+		LockingScript: scriptObj,
+	}
+
+	err = service.OutputAdmittedByTopic(context.Background(), payload)
 	assert.NoError(t, err) // Should silently ignore non-SHIP protocols
 }
 
@@ -232,46 +283,49 @@ func TestOutputAdmittedByTopic_IgnoreNonSHIPProtocol(t *testing.T) {
 func TestOutputSpent_Success(t *testing.T) {
 	service, mockStorage := createTestSHIPLookupService()
 
-	payload := types.OutputSpent{
-		Mode:        types.SpendNotificationModeNone,
-		Topic:       SHIPTopic,
-		Txid:        "abc123",
-		OutputIndex: 0,
+	// Create outpoint
+	txidBytes, err := hex.DecodeString(TxId)
+	require.NoError(t, err)
+	var txidArray [32]byte
+	copy(txidArray[:], txidBytes)
+
+	outpoint := &transaction.Outpoint{
+		Txid:  txidArray,
+		Index: 0,
 	}
 
-	mockStorage.On("DeleteSHIPRecord", mock.Anything, "abc123", 0).Return(nil)
+	payload := &engine.OutputSpent{
+		Topic:    SHIPTopic,
+		Outpoint: outpoint,
+	}
 
-	err := service.OutputSpent(context.Background(), payload)
+	mockStorage.On("DeleteSHIPRecord", mock.Anything, TxId, 0).Return(nil)
+
+	err = service.OutputSpent(context.Background(), payload)
 	assert.NoError(t, err)
 	mockStorage.AssertExpectations(t)
-}
-
-func TestOutputSpent_InvalidMode(t *testing.T) {
-	service, _ := createTestSHIPLookupService()
-
-	payload := types.OutputSpent{
-		Mode:        "invalid-mode",
-		Topic:       SHIPTopic,
-		Txid:        "abc123",
-		OutputIndex: 0,
-	}
-
-	err := service.OutputSpent(context.Background(), payload)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid payload: expected spend notification mode 'none'")
 }
 
 func TestOutputSpent_IgnoreNonSHIPTopic(t *testing.T) {
 	service, _ := createTestSHIPLookupService()
 
-	payload := types.OutputSpent{
-		Mode:        types.SpendNotificationModeNone,
-		Topic:       "tm_other",
-		Txid:        "abc123",
-		OutputIndex: 0,
+	// Create outpoint
+	txidBytes, err := hex.DecodeString(TxId)
+	require.NoError(t, err)
+	var txidArray [32]byte
+	copy(txidArray[:], txidBytes)
+
+	outpoint := &transaction.Outpoint{
+		Txid:  txidArray,
+		Index: 0,
 	}
 
-	err := service.OutputSpent(context.Background(), payload)
+	payload := &engine.OutputSpent{
+		Topic:    "tm_other",
+		Outpoint: outpoint,
+	}
+
+	err = service.OutputSpent(context.Background(), payload)
 	assert.NoError(t, err) // Should silently ignore non-SHIP topics
 }
 
@@ -280,9 +334,20 @@ func TestOutputSpent_IgnoreNonSHIPTopic(t *testing.T) {
 func TestOutputEvicted_Success(t *testing.T) {
 	service, mockStorage := createTestSHIPLookupService()
 
-	mockStorage.On("DeleteSHIPRecord", mock.Anything, "abc123", 0).Return(nil)
+	// Create outpoint
+	txidBytes, err := hex.DecodeString(TxId)
+	require.NoError(t, err)
+	var txidArray [32]byte
+	copy(txidArray[:], txidBytes)
 
-	err := service.OutputEvicted(context.Background(), "abc123", 0)
+	outpoint := &transaction.Outpoint{
+		Txid:  txidArray,
+		Index: 0,
+	}
+
+	mockStorage.On("DeleteSHIPRecord", mock.Anything, TxId, 0).Return(nil)
+
+	err = service.OutputEvicted(context.Background(), outpoint)
 	assert.NoError(t, err)
 	mockStorage.AssertExpectations(t)
 }
@@ -290,9 +355,20 @@ func TestOutputEvicted_Success(t *testing.T) {
 func TestOutputEvicted_StorageError(t *testing.T) {
 	service, mockStorage := createTestSHIPLookupService()
 
-	mockStorage.On("DeleteSHIPRecord", mock.Anything, "abc123", 0).Return(errors.New("storage error"))
+	// Create outpoint
+	txidBytes, err := hex.DecodeString(TxId)
+	require.NoError(t, err)
+	var txidArray [32]byte
+	copy(txidArray[:], txidBytes)
 
-	err := service.OutputEvicted(context.Background(), "abc123", 0)
+	outpoint := &transaction.Outpoint{
+		Txid:  txidArray,
+		Index: 0,
+	}
+
+	mockStorage.On("DeleteSHIPRecord", mock.Anything, TxId, 0).Return(errors.New("storage error"))
+
+	err = service.OutputEvicted(context.Background(), outpoint)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "storage error")
 }
@@ -302,9 +378,9 @@ func TestOutputEvicted_StorageError(t *testing.T) {
 func TestLookup_LegacyFindAll(t *testing.T) {
 	service, mockStorage := createTestSHIPLookupService()
 
-	question := types.LookupQuestion{
+	question := &lookup.LookupQuestion{
 		Service: SHIPService,
-		Query:   "findAll",
+		Query:   json.RawMessage(`"findAll"`),
 	}
 
 	expectedResults := []types.UTXOReference{
@@ -316,16 +392,21 @@ func TestLookup_LegacyFindAll(t *testing.T) {
 
 	results, err := service.Lookup(context.Background(), question)
 	assert.NoError(t, err)
-	assert.Equal(t, types.LookupFormula(expectedResults), results)
+	assert.Equal(t, lookup.AnswerTypeFreeform, results.Type)
+	if utxos, ok := results.Result.([]types.UTXOReference); ok {
+		assert.Equal(t, expectedResults, utxos)
+	} else {
+		t.Errorf("Expected UTXOReference slice, got %T", results.Result)
+	}
 	mockStorage.AssertExpectations(t)
 }
 
 func TestLookup_NilQuery(t *testing.T) {
 	service, _ := createTestSHIPLookupService()
 
-	question := types.LookupQuestion{
+	question := &lookup.LookupQuestion{
 		Service: SHIPService,
-		Query:   nil,
+		Query:   json.RawMessage{},
 	}
 
 	_, err := service.Lookup(context.Background(), question)
@@ -336,9 +417,9 @@ func TestLookup_NilQuery(t *testing.T) {
 func TestLookup_WrongService(t *testing.T) {
 	service, _ := createTestSHIPLookupService()
 
-	question := types.LookupQuestion{
+	question := &lookup.LookupQuestion{
 		Service: "ls_other",
-		Query:   "findAll",
+		Query:   json.RawMessage(`"findAll"`),
 	}
 
 	_, err := service.Lookup(context.Background(), question)
@@ -349,9 +430,9 @@ func TestLookup_WrongService(t *testing.T) {
 func TestLookup_InvalidStringQuery(t *testing.T) {
 	service, _ := createTestSHIPLookupService()
 
-	question := types.LookupQuestion{
+	question := &lookup.LookupQuestion{
 		Service: SHIPService,
-		Query:   "invalid",
+		Query:   json.RawMessage(`"invalid"`),
 	}
 
 	_, err := service.Lookup(context.Background(), question)
@@ -374,9 +455,10 @@ func TestLookup_ObjectQuery_FindAll(t *testing.T) {
 		"sortOrder": sortOrder,
 	}
 
-	question := types.LookupQuestion{
+	queryJSON, _ := json.Marshal(query)
+	question := &lookup.LookupQuestion{
 		Service: SHIPService,
-		Query:   query,
+		Query:   queryJSON,
 	}
 
 	expectedResults := []types.UTXOReference{
@@ -387,7 +469,12 @@ func TestLookup_ObjectQuery_FindAll(t *testing.T) {
 
 	results, err := service.Lookup(context.Background(), question)
 	assert.NoError(t, err)
-	assert.Equal(t, types.LookupFormula(expectedResults), results)
+	assert.Equal(t, lookup.AnswerTypeFreeform, results.Type)
+	if utxos, ok := results.Result.([]types.UTXOReference); ok {
+		assert.Equal(t, expectedResults, utxos)
+	} else {
+		t.Errorf("Expected UTXOReference slice, got %T", results.Result)
+	}
 	mockStorage.AssertExpectations(t)
 }
 
@@ -404,9 +491,10 @@ func TestLookup_ObjectQuery_SpecificQuery(t *testing.T) {
 		"identityKey": identityKey,
 	}
 
-	question := types.LookupQuestion{
+	queryJSON, _ := json.Marshal(query)
+	question := &lookup.LookupQuestion{
 		Service: SHIPService,
-		Query:   query,
+		Query:   queryJSON,
 	}
 
 	expectedQuery := types.SHIPQuery{
@@ -423,7 +511,12 @@ func TestLookup_ObjectQuery_SpecificQuery(t *testing.T) {
 
 	results, err := service.Lookup(context.Background(), question)
 	assert.NoError(t, err)
-	assert.Equal(t, types.LookupFormula(expectedResults), results)
+	assert.Equal(t, lookup.AnswerTypeFreeform, results.Type)
+	if utxos, ok := results.Result.([]types.UTXOReference); ok {
+		assert.Equal(t, expectedResults, utxos)
+	} else {
+		t.Errorf("Expected UTXOReference slice, got %T", results.Result)
+	}
 	mockStorage.AssertExpectations(t)
 }
 
@@ -434,9 +527,10 @@ func TestLookup_ValidationError_NegativeLimit(t *testing.T) {
 		"limit": -1,
 	}
 
-	question := types.LookupQuestion{
+	queryJSON, _ := json.Marshal(query)
+	question := &lookup.LookupQuestion{
 		Service: SHIPService,
-		Query:   query,
+		Query:   queryJSON,
 	}
 
 	_, err := service.Lookup(context.Background(), question)
@@ -451,9 +545,10 @@ func TestLookup_ValidationError_NegativeSkip(t *testing.T) {
 		"skip": -1,
 	}
 
-	question := types.LookupQuestion{
+	queryJSON, _ := json.Marshal(query)
+	question := &lookup.LookupQuestion{
 		Service: SHIPService,
-		Query:   query,
+		Query:   queryJSON,
 	}
 
 	_, err := service.Lookup(context.Background(), question)
@@ -468,9 +563,10 @@ func TestLookup_ValidationError_InvalidSortOrder(t *testing.T) {
 		"sortOrder": "invalid",
 	}
 
-	question := types.LookupQuestion{
+	queryJSON, _ := json.Marshal(query)
+	question := &lookup.LookupQuestion{
 		Service: SHIPService,
-		Query:   query,
+		Query:   queryJSON,
 	}
 
 	_, err := service.Lookup(context.Background(), question)
@@ -483,8 +579,7 @@ func TestLookup_ValidationError_InvalidSortOrder(t *testing.T) {
 func TestGetDocumentation(t *testing.T) {
 	service, _ := createTestSHIPLookupService()
 
-	doc, err := service.GetDocumentation()
-	assert.NoError(t, err)
+	doc := service.GetDocumentation()
 	assert.Equal(t, LookupDocumentation, doc)
 	assert.Contains(t, doc, "# SHIP Lookup Service")
 	assert.Contains(t, doc, "Service Host Interconnect Protocol")
@@ -495,13 +590,12 @@ func TestGetDocumentation(t *testing.T) {
 func TestGetMetaData(t *testing.T) {
 	service, _ := createTestSHIPLookupService()
 
-	metadata, err := service.GetMetaData()
-	assert.NoError(t, err)
+	metadata := service.GetMetaData()
 	assert.Equal(t, "SHIP Lookup Service", metadata.Name)
-	assert.Equal(t, "Provides lookup capabilities for SHIP tokens.", metadata.ShortDescription)
-	assert.Nil(t, metadata.IconURL)
-	assert.Nil(t, metadata.Version)
-	assert.Nil(t, metadata.InformationURL)
+	assert.Equal(t, "Provides lookup capabilities for SHIP tokens.", metadata.Description)
+	assert.Empty(t, metadata.Icon)
+	assert.Empty(t, metadata.Version)
+	assert.Empty(t, metadata.InfoUrl)
 }
 
 // Test edge cases and error scenarios
@@ -509,9 +603,9 @@ func TestGetMetaData(t *testing.T) {
 func TestLookup_StorageError(t *testing.T) {
 	service, mockStorage := createTestSHIPLookupService()
 
-	question := types.LookupQuestion{
+	question := &lookup.LookupQuestion{
 		Service: SHIPService,
-		Query:   "findAll",
+		Query:   json.RawMessage(`"findAll"`),
 	}
 
 	mockStorage.On("FindAll", mock.Anything, (*int)(nil), (*int)(nil), (*types.SortOrder)(nil)).Return([]types.UTXOReference{}, errors.New("storage error"))
@@ -531,19 +625,30 @@ func TestOutputAdmittedByTopic_StorageError(t *testing.T) {
 		[]byte("https://example.com"),  // Domain
 		[]byte("tm_bridge"),            // Topic
 	}
-	validScript := createValidPushDropScript(fields)
+	validScriptHex := createValidPushDropScript(fields)
+	scriptObj, err := script.NewFromHex(validScriptHex)
+	require.NoError(t, err)
 
-	payload := types.OutputAdmittedByTopic{
-		Mode:          types.AdmissionModeLockingScript,
-		Topic:         SHIPTopic,
-		LockingScript: validScript,
-		Txid:          "abc123",
-		OutputIndex:   0,
+	// Create outpoint
+	txidBytes, err := hex.DecodeString(TxId)
+	require.NoError(t, err)
+	var txidArray [32]byte
+	copy(txidArray[:], txidBytes)
+
+	outpoint := &transaction.Outpoint{
+		Txid:  txidArray,
+		Index: 0,
 	}
 
-	mockStorage.On("StoreSHIPRecord", mock.Anything, "abc123", 0, "01020304", "https://example.com", "tm_bridge").Return(errors.New("storage error"))
+	payload := &engine.OutputAdmittedByTopic{
+		Topic:         SHIPTopic,
+		Outpoint:      outpoint,
+		LockingScript: scriptObj,
+	}
 
-	err := service.OutputAdmittedByTopic(context.Background(), payload)
+	mockStorage.On("StoreSHIPRecord", mock.Anything, TxId, 0, "01020304", "https://example.com", "tm_bridge").Return(errors.New("storage error"))
+
+	err = service.OutputAdmittedByTopic(context.Background(), payload)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "storage error")
 }
@@ -569,9 +674,10 @@ func TestLookup_ComplexObjectQuery(t *testing.T) {
 		"sortOrder":   sortOrder,
 	}
 
-	question := types.LookupQuestion{
+	queryJSON, _ := json.Marshal(query)
+	question := &lookup.LookupQuestion{
 		Service: SHIPService,
-		Query:   query,
+		Query:   queryJSON,
 	}
 
 	expectedQuery := types.SHIPQuery{
@@ -592,7 +698,50 @@ func TestLookup_ComplexObjectQuery(t *testing.T) {
 
 	results, err := service.Lookup(context.Background(), question)
 	assert.NoError(t, err)
-	assert.Equal(t, types.LookupFormula(expectedResults), results)
-	assert.Len(t, results, 2)
+	assert.Equal(t, lookup.AnswerTypeFreeform, results.Type)
+	if utxos, ok := results.Result.([]types.UTXOReference); ok {
+		assert.Equal(t, expectedResults, utxos)
+		assert.Len(t, utxos, 2)
+	} else {
+		t.Errorf("Expected UTXOReference slice, got %T", results.Result)
+	}
+	mockStorage.AssertExpectations(t)
+}
+
+func TestSHIPLookupService_OutputNoLongerRetainedInHistory(t *testing.T) {
+	mockStorage := &MockSHIPStorageInterface{}
+	service := NewSHIPLookupService(mockStorage)
+
+	// Create test outpoint
+	outpoint := &transaction.Outpoint{
+		Txid:  [32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32},
+		Index: 0,
+	}
+
+	// Test that OutputNoLongerRetainedInHistory does nothing (no-op)
+	err := service.OutputNoLongerRetainedInHistory(context.Background(), outpoint, "tm_ship")
+	assert.NoError(t, err)
+
+	// Verify no storage methods were called
+	mockStorage.AssertExpectations(t)
+}
+
+func TestSHIPLookupService_OutputBlockHeightUpdated(t *testing.T) {
+	mockStorage := &MockSHIPStorageInterface{}
+	service := NewSHIPLookupService(mockStorage)
+
+	// Create test transaction ID
+	txidBytes, err := hex.DecodeString("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
+	require.NoError(t, err)
+	var txidArray [32]byte
+	copy(txidArray[:], txidBytes)
+	txid := &chainhash.Hash{}
+	copy(txid[:], txidArray[:])
+
+	// Test that OutputBlockHeightUpdated does nothing (no-op)
+	err = service.OutputBlockHeightUpdated(context.Background(), txid, 12345, 0)
+	assert.NoError(t, err)
+
+	// Verify no storage methods were called
 	mockStorage.AssertExpectations(t)
 }

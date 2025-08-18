@@ -11,7 +11,11 @@ import (
 	"reflect"
 
 	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
-	"github.com/bsv-blockchain/go-sdk/script"
+	"github.com/bsv-blockchain/go-overlay-services/pkg/core/engine"
+	"github.com/bsv-blockchain/go-sdk/chainhash"
+	"github.com/bsv-blockchain/go-sdk/overlay"
+	"github.com/bsv-blockchain/go-sdk/overlay/lookup"
+	"github.com/bsv-blockchain/go-sdk/transaction"
 	"github.com/bsv-blockchain/go-sdk/transaction/template/pushdrop"
 )
 
@@ -42,8 +46,8 @@ type SHIPLookupService struct {
 	storage SHIPStorageInterface
 }
 
-// Compile-time verification that SHIPLookupService implements types.LookupService
-var _ types.LookupService = (*SHIPLookupService)(nil)
+// Compile-time verification that SHIPLookupService implements engine.LookupService
+var _ engine.LookupService = (*SHIPLookupService)(nil)
 
 // Compile-time verification that SHIPStorage implements SHIPStorageInterface
 var _ SHIPStorageInterface = (*SHIPStorage)(nil)
@@ -76,22 +80,14 @@ func NewSHIPLookupService(storage SHIPStorageInterface) *SHIPLookupService {
 //
 // Returns:
 //   - error: An error if processing fails, nil otherwise
-func (s *SHIPLookupService) OutputAdmittedByTopic(ctx context.Context, payload types.OutputAdmittedByTopic) error {
-	// Validate admission mode
-	if payload.Mode != types.AdmissionModeLockingScript {
-		return fmt.Errorf("invalid payload: expected admission mode 'locking-script', got '%s'", payload.Mode)
-	}
-
+func (s *SHIPLookupService) OutputAdmittedByTopic(ctx context.Context, payload *engine.OutputAdmittedByTopic) error {
 	// Only process SHIP topic
 	if payload.Topic != SHIPTopic {
 		return nil // Silently ignore non-SHIP topics
 	}
 
-	// Create script from hex string
-	scriptObj, err := script.NewFromHex(payload.LockingScript)
-	if err != nil {
-		return fmt.Errorf("failed to create script from hex: %w", err)
-	}
+	// Use the locking script from payload
+	scriptObj := payload.LockingScript
 
 	// Decode the PushDrop locking script
 	result := pushdrop.Decode(scriptObj)
@@ -115,7 +111,8 @@ func (s *SHIPLookupService) OutputAdmittedByTopic(ctx context.Context, payload t
 	topicSupported := string(result.Fields[3])
 
 	// Store the SHIP record
-	return s.storage.StoreSHIPRecord(ctx, payload.Txid, payload.OutputIndex, identityKey, domain, topicSupported)
+	txid := hex.EncodeToString(payload.Outpoint.Txid[:])
+	return s.storage.StoreSHIPRecord(ctx, txid, int(payload.Outpoint.Index), identityKey, domain, topicSupported)
 }
 
 // OutputSpent handles an output being spent.
@@ -126,33 +123,45 @@ func (s *SHIPLookupService) OutputAdmittedByTopic(ctx context.Context, payload t
 //
 // Returns:
 //   - error: An error if processing fails, nil otherwise
-func (s *SHIPLookupService) OutputSpent(ctx context.Context, payload types.OutputSpent) error {
-	// Validate spend notification mode
-	if payload.Mode != types.SpendNotificationModeNone {
-		return fmt.Errorf("invalid payload: expected spend notification mode 'none', got '%s'", payload.Mode)
-	}
-
+func (s *SHIPLookupService) OutputSpent(ctx context.Context, payload *engine.OutputSpent) error {
 	// Only process SHIP topic
 	if payload.Topic != SHIPTopic {
 		return nil // Silently ignore non-SHIP topics
 	}
 
 	// Delete the SHIP record
-	return s.storage.DeleteSHIPRecord(ctx, payload.Txid, payload.OutputIndex)
+	txid := hex.EncodeToString(payload.Outpoint.Txid[:])
+	return s.storage.DeleteSHIPRecord(ctx, txid, int(payload.Outpoint.Index))
 }
 
 // OutputEvicted handles an output being evicted.
 // This method removes the corresponding SHIP record when the UTXO is evicted from the mempool.
 //
 // Parameters:
-//   - txid: The transaction ID of the evicted output
-//   - outputIndex: The index of the evicted output within the transaction
+//   - outpoint: The outpoint of the evicted output
 //
 // Returns:
 //   - error: An error if processing fails, nil otherwise
-func (s *SHIPLookupService) OutputEvicted(ctx context.Context, txid string, outputIndex int) error {
+func (s *SHIPLookupService) OutputEvicted(ctx context.Context, outpoint *transaction.Outpoint) error {
 	// Delete the SHIP record
-	return s.storage.DeleteSHIPRecord(ctx, txid, outputIndex)
+	txid := hex.EncodeToString(outpoint.Txid[:])
+	return s.storage.DeleteSHIPRecord(ctx, txid, int(outpoint.Index))
+}
+
+// OutputNoLongerRetainedInHistory handles outputs no longer retained in history.
+// Called when a Topic Manager decides that historical retention of the specified UTXO is no longer required.
+// For SHIP discovery services, this is typically a no-op as they don't maintain historical retention.
+func (s *SHIPLookupService) OutputNoLongerRetainedInHistory(ctx context.Context, outpoint *transaction.Outpoint, topic string) error {
+	// Discovery services don't have the concept of historical retention, so we ignore it
+	return nil
+}
+
+// OutputBlockHeightUpdated handles block height updates for transactions.
+// Called when the block height of a transaction is updated (e.g., when a transaction is included in a block).
+// For SHIP discovery services, this is typically a no-op as they don't track block heights.
+func (s *SHIPLookupService) OutputBlockHeightUpdated(ctx context.Context, txid *chainhash.Hash, blockHeight uint32, blockIndex uint64) error {
+	// Discovery services don't handle block height updates, so we ignore it
+	return nil
 }
 
 // Lookup performs a lookup query and returns matching results.
@@ -167,11 +176,11 @@ func (s *SHIPLookupService) OutputEvicted(ctx context.Context, txid string, outp
 //   - question: The lookup question containing service identifier and query parameters
 //
 // Returns:
-//   - types.LookupFormula: Matching UTXO references
+//   - *lookup.LookupAnswer: Matching UTXO references
 //   - error: An error if the query fails or is invalid, nil otherwise
-func (s *SHIPLookupService) Lookup(ctx context.Context, question types.LookupQuestion) (types.LookupFormula, error) {
+func (s *SHIPLookupService) Lookup(ctx context.Context, question *lookup.LookupQuestion) (*lookup.LookupAnswer, error) {
 	// Validate required fields
-	if question.Query == nil {
+	if len(question.Query) == 0 {
 		return nil, fmt.Errorf("a valid query must be provided")
 	}
 
@@ -179,27 +188,44 @@ func (s *SHIPLookupService) Lookup(ctx context.Context, question types.LookupQue
 		return nil, fmt.Errorf("lookup service not supported: expected '%s', got '%s'", SHIPService, question.Service)
 	}
 
+	// Parse the query from JSON
+	var queryInterface interface{}
+	if err := json.Unmarshal(question.Query, &queryInterface); err != nil {
+		return nil, fmt.Errorf("failed to parse query JSON: %w", err)
+	}
+
 	// Handle legacy "findAll" string query
-	if queryStr, ok := question.Query.(string); ok {
+	if queryStr, ok := queryInterface.(string); ok {
 		if queryStr == "findAll" {
-			return s.storage.FindAll(ctx, nil, nil, nil)
+			utxos, err := s.storage.FindAll(ctx, nil, nil, nil)
+			if err != nil {
+				return nil, err
+			}
+			return s.convertUTXOsToLookupAnswer(utxos), nil
 		}
 		return nil, fmt.Errorf("invalid string query: only 'findAll' is supported, got '%s'", queryStr)
 	}
 
 	// Handle object-based query
-	queryObj, err := s.parseQueryObject(question.Query)
+	queryObj, err := s.parseQueryObject(queryInterface)
 	if err != nil {
 		return nil, fmt.Errorf("invalid query format: %w", err)
 	}
 
+	var utxos []types.UTXOReference
 	// Handle findAll with pagination
 	if queryObj.FindAll != nil && *queryObj.FindAll {
-		return s.storage.FindAll(ctx, queryObj.Limit, queryObj.Skip, queryObj.SortOrder)
+		utxos, err = s.storage.FindAll(ctx, queryObj.Limit, queryObj.Skip, queryObj.SortOrder)
+	} else {
+		// Handle specific query with filters
+		utxos, err = s.storage.FindRecord(ctx, *queryObj)
 	}
 
-	// Handle specific query with filters
-	return s.storage.FindRecord(ctx, *queryObj)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.convertUTXOsToLookupAnswer(utxos), nil
 }
 
 // parseQueryObject parses and validates a query object
@@ -282,9 +308,17 @@ func (s *SHIPLookupService) validateQuery(query *types.SHIPQuery) error {
 //
 // Returns:
 //   - string: The service documentation in markdown format
-//   - error: Always nil (no errors expected)
-func (s *SHIPLookupService) GetDocumentation() (string, error) {
-	return LookupDocumentation, nil
+func (s *SHIPLookupService) GetDocumentation() string {
+	return LookupDocumentation
+}
+
+// convertUTXOsToLookupAnswer converts a slice of UTXO references to a LookupAnswer
+func (s *SHIPLookupService) convertUTXOsToLookupAnswer(utxos []types.UTXOReference) *lookup.LookupAnswer {
+	// For discovery services, we return the UTXOs as freeform result
+	return &lookup.LookupAnswer{
+		Type:   lookup.AnswerTypeFreeform,
+		Result: utxos,
+	}
 }
 
 // GetMetaData returns the service metadata.
@@ -292,11 +326,10 @@ func (s *SHIPLookupService) GetDocumentation() (string, error) {
 // including name and description.
 //
 // Returns:
-//   - types.MetaData: The service metadata
-//   - error: Always nil (no errors expected)
-func (s *SHIPLookupService) GetMetaData() (types.MetaData, error) {
-	return types.MetaData{
-		Name:             "SHIP Lookup Service",
-		ShortDescription: "Provides lookup capabilities for SHIP tokens.",
-	}, nil
+//   - *overlay.MetaData: The service metadata
+func (s *SHIPLookupService) GetMetaData() *overlay.MetaData {
+	return &overlay.MetaData{
+		Name:        "SHIP Lookup Service",
+		Description: "Provides lookup capabilities for SHIP tokens.",
+	}
 }
