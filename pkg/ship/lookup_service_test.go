@@ -2,10 +2,12 @@ package ship
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"testing"
 
 	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
+	"github.com/bsv-blockchain/go-sdk/script"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -42,93 +44,85 @@ func (m *MockSHIPStorageInterface) EnsureIndexes(ctx context.Context) error {
 	return args.Error(0)
 }
 
-// TestMockPushDropDecoder is a mock implementation of PushDropDecoder for testing
-type TestMockPushDropDecoder struct {
-	mock.Mock
-}
-
-func (m *TestMockPushDropDecoder) Decode(lockingScript string) (*types.PushDropResult, error) {
-	args := m.Called(lockingScript)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*types.PushDropResult), args.Error(1)
-}
-
-// TestMockUtils is a mock implementation of Utils for testing
-type TestMockUtils struct {
-	mock.Mock
-}
-
-func (m *TestMockUtils) ToUTF8(data []byte) string {
-	args := m.Called(data)
-	return args.String(0)
-}
-
-func (m *TestMockUtils) ToHex(data []byte) string {
-	args := m.Called(data)
-	return args.String(0)
-}
+// Note: Mock PushDropDecoder and Utils are no longer needed since we use real implementations
 
 // Test helper functions
 
-func createTestSHIPLookupService() (*SHIPLookupService, *MockSHIPStorageInterface, *TestMockPushDropDecoder, *TestMockUtils) {
+func createTestSHIPLookupService() (*SHIPLookupService, *MockSHIPStorageInterface) {
 	mockStorage := new(MockSHIPStorageInterface)
-	mockPushDrop := new(TestMockPushDropDecoder)
-	mockUtils := new(TestMockUtils)
-
-	service := NewSHIPLookupService(mockStorage, mockPushDrop, mockUtils)
-
-	return service, mockStorage, mockPushDrop, mockUtils
+	service := NewSHIPLookupService(mockStorage)
+	return service, mockStorage
 }
 
-func createValidPushDropResult() *types.PushDropResult {
-	return &types.PushDropResult{
-		Fields: [][]byte{
-			[]byte("SHIP"),                 // Protocol identifier
-			[]byte{0x01, 0x02, 0x03, 0x04}, // Identity key bytes
-			[]byte("https://example.com"),  // Domain
-			[]byte("tm_bridge"),            // Topic
-		},
+// createValidPushDropScript creates a valid PushDrop script with the specified fields
+func createValidPushDropScript(fields [][]byte) string {
+	// Create a valid public key (33 bytes) - this is a known valid public key
+	pubKeyHex := "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+	pubKeyBytes, _ := hex.DecodeString(pubKeyHex)
+
+	// Start building the script
+	s := &script.Script{}
+
+	// Add public key
+	s.AppendPushData(pubKeyBytes)
+
+	// Add OP_CHECKSIG
+	s.AppendOpcodes(script.OpCHECKSIG)
+
+	// Add fields using PushData
+	for _, field := range fields {
+		s.AppendPushData(field)
 	}
+
+	// Add DROP operations to remove fields from stack
+	notYetDropped := len(fields)
+	for notYetDropped > 1 {
+		s.AppendOpcodes(script.Op2DROP)
+		notYetDropped -= 2
+	}
+	if notYetDropped != 0 {
+		s.AppendOpcodes(script.OpDROP)
+	}
+
+	return s.String()
 }
+
+// createValidPushDropResult helper removed - using real PushDrop scripts instead
 
 // Test NewSHIPLookupService
 
 func TestNewSHIPLookupService(t *testing.T) {
 	mockStorage := new(MockSHIPStorageInterface)
-	mockPushDrop := new(TestMockPushDropDecoder)
-	mockUtils := new(TestMockUtils)
 
-	service := NewSHIPLookupService(mockStorage, mockPushDrop, mockUtils)
+	service := NewSHIPLookupService(mockStorage)
 
 	assert.NotNil(t, service)
 	assert.Equal(t, mockStorage, service.storage)
-	assert.Equal(t, mockPushDrop, service.pushDropDecoder)
-	assert.Equal(t, mockUtils, service.utils)
 }
 
 // Test OutputAdmittedByTopic
 
 func TestOutputAdmittedByTopic_Success(t *testing.T) {
-	service, mockStorage, mockPushDrop, mockUtils := createTestSHIPLookupService()
+	service, mockStorage := createTestSHIPLookupService()
+
+	// Create valid PushDrop script with SHIP data
+	fields := [][]byte{
+		[]byte("SHIP"),                 // Protocol identifier
+		[]byte{0x01, 0x02, 0x03, 0x04}, // Identity key bytes
+		[]byte("https://example.com"),  // Domain
+		[]byte("tm_bridge"),            // Topic
+	}
+	validScript := createValidPushDropScript(fields)
 
 	payload := types.OutputAdmittedByTopic{
 		Mode:          types.AdmissionModeLockingScript,
 		Topic:         SHIPTopic,
-		LockingScript: "deadbeef",
+		LockingScript: validScript,
 		Txid:          "abc123",
 		OutputIndex:   0,
 	}
 
-	pushDropResult := createValidPushDropResult()
-
-	// Set up mocks
-	mockPushDrop.On("Decode", "deadbeef").Return(pushDropResult, nil)
-	mockUtils.On("ToUTF8", []byte("SHIP")).Return("SHIP")
-	mockUtils.On("ToHex", []byte{0x01, 0x02, 0x03, 0x04}).Return("01020304")
-	mockUtils.On("ToUTF8", []byte("https://example.com")).Return("https://example.com")
-	mockUtils.On("ToUTF8", []byte("tm_bridge")).Return("tm_bridge")
+	// Set up mock for storage
 	mockStorage.On("StoreSHIPRecord", mock.Anything, "abc123", 0, "01020304", "https://example.com", "tm_bridge").Return(nil)
 
 	// Execute
@@ -136,13 +130,11 @@ func TestOutputAdmittedByTopic_Success(t *testing.T) {
 
 	// Assert
 	assert.NoError(t, err)
-	mockPushDrop.AssertExpectations(t)
-	mockUtils.AssertExpectations(t)
 	mockStorage.AssertExpectations(t)
 }
 
 func TestOutputAdmittedByTopic_InvalidMode(t *testing.T) {
-	service, _, _, _ := createTestSHIPLookupService()
+	service, _ := createTestSHIPLookupService()
 
 	payload := types.OutputAdmittedByTopic{
 		Mode:          "invalid-mode",
@@ -158,7 +150,7 @@ func TestOutputAdmittedByTopic_InvalidMode(t *testing.T) {
 }
 
 func TestOutputAdmittedByTopic_IgnoreNonSHIPTopic(t *testing.T) {
-	service, _, _, _ := createTestSHIPLookupService()
+	service, _ := createTestSHIPLookupService()
 
 	payload := types.OutputAdmittedByTopic{
 		Mode:          types.AdmissionModeLockingScript,
@@ -173,17 +165,15 @@ func TestOutputAdmittedByTopic_IgnoreNonSHIPTopic(t *testing.T) {
 }
 
 func TestOutputAdmittedByTopic_PushDropDecodeError(t *testing.T) {
-	service, _, mockPushDrop, _ := createTestSHIPLookupService()
+	service, _ := createTestSHIPLookupService()
 
 	payload := types.OutputAdmittedByTopic{
 		Mode:          types.AdmissionModeLockingScript,
 		Topic:         SHIPTopic,
-		LockingScript: "deadbeef",
+		LockingScript: "deadbeef", // Invalid script that can't be decoded
 		Txid:          "abc123",
 		OutputIndex:   0,
 	}
-
-	mockPushDrop.On("Decode", "deadbeef").Return(nil, errors.New("decode error"))
 
 	err := service.OutputAdmittedByTopic(context.Background(), payload)
 	assert.Error(t, err)
@@ -191,25 +181,22 @@ func TestOutputAdmittedByTopic_PushDropDecodeError(t *testing.T) {
 }
 
 func TestOutputAdmittedByTopic_InsufficientFields(t *testing.T) {
-	service, _, mockPushDrop, _ := createTestSHIPLookupService()
+	service, _ := createTestSHIPLookupService()
+
+	// Create PushDrop script with only 2 fields instead of required 4
+	fields := [][]byte{
+		[]byte("SHIP"),
+		[]byte{0x01, 0x02, 0x03, 0x04},
+	}
+	invalidScript := createValidPushDropScript(fields)
 
 	payload := types.OutputAdmittedByTopic{
 		Mode:          types.AdmissionModeLockingScript,
 		Topic:         SHIPTopic,
-		LockingScript: "deadbeef",
+		LockingScript: invalidScript,
 		Txid:          "abc123",
 		OutputIndex:   0,
 	}
-
-	// Only 2 fields instead of required 4
-	pushDropResult := &types.PushDropResult{
-		Fields: [][]byte{
-			[]byte("SHIP"),
-			[]byte{0x01, 0x02, 0x03, 0x04},
-		},
-	}
-
-	mockPushDrop.On("Decode", "deadbeef").Return(pushDropResult, nil)
 
 	err := service.OutputAdmittedByTopic(context.Background(), payload)
 	assert.Error(t, err)
@@ -217,21 +204,24 @@ func TestOutputAdmittedByTopic_InsufficientFields(t *testing.T) {
 }
 
 func TestOutputAdmittedByTopic_IgnoreNonSHIPProtocol(t *testing.T) {
-	service, _, mockPushDrop, mockUtils := createTestSHIPLookupService()
+	service, _ := createTestSHIPLookupService()
+
+	// Create valid PushDrop script with SLAP protocol instead of SHIP
+	fields := [][]byte{
+		[]byte("SLAP"),                 // Different protocol
+		[]byte{0x01, 0x02, 0x03, 0x04}, // Identity key bytes
+		[]byte("https://example.com"),  // Domain
+		[]byte("tm_bridge"),            // Topic
+	}
+	validScript := createValidPushDropScript(fields)
 
 	payload := types.OutputAdmittedByTopic{
 		Mode:          types.AdmissionModeLockingScript,
 		Topic:         SHIPTopic,
-		LockingScript: "deadbeef",
+		LockingScript: validScript,
 		Txid:          "abc123",
 		OutputIndex:   0,
 	}
-
-	pushDropResult := createValidPushDropResult()
-	pushDropResult.Fields[0] = []byte("SLAP") // Different protocol
-
-	mockPushDrop.On("Decode", "deadbeef").Return(pushDropResult, nil)
-	mockUtils.On("ToUTF8", []byte("SLAP")).Return("SLAP")
 
 	err := service.OutputAdmittedByTopic(context.Background(), payload)
 	assert.NoError(t, err) // Should silently ignore non-SHIP protocols
@@ -240,7 +230,7 @@ func TestOutputAdmittedByTopic_IgnoreNonSHIPProtocol(t *testing.T) {
 // Test OutputSpent
 
 func TestOutputSpent_Success(t *testing.T) {
-	service, mockStorage, _, _ := createTestSHIPLookupService()
+	service, mockStorage := createTestSHIPLookupService()
 
 	payload := types.OutputSpent{
 		Mode:        types.SpendNotificationModeNone,
@@ -257,7 +247,7 @@ func TestOutputSpent_Success(t *testing.T) {
 }
 
 func TestOutputSpent_InvalidMode(t *testing.T) {
-	service, _, _, _ := createTestSHIPLookupService()
+	service, _ := createTestSHIPLookupService()
 
 	payload := types.OutputSpent{
 		Mode:        "invalid-mode",
@@ -272,7 +262,7 @@ func TestOutputSpent_InvalidMode(t *testing.T) {
 }
 
 func TestOutputSpent_IgnoreNonSHIPTopic(t *testing.T) {
-	service, _, _, _ := createTestSHIPLookupService()
+	service, _ := createTestSHIPLookupService()
 
 	payload := types.OutputSpent{
 		Mode:        types.SpendNotificationModeNone,
@@ -288,7 +278,7 @@ func TestOutputSpent_IgnoreNonSHIPTopic(t *testing.T) {
 // Test OutputEvicted
 
 func TestOutputEvicted_Success(t *testing.T) {
-	service, mockStorage, _, _ := createTestSHIPLookupService()
+	service, mockStorage := createTestSHIPLookupService()
 
 	mockStorage.On("DeleteSHIPRecord", mock.Anything, "abc123", 0).Return(nil)
 
@@ -298,7 +288,7 @@ func TestOutputEvicted_Success(t *testing.T) {
 }
 
 func TestOutputEvicted_StorageError(t *testing.T) {
-	service, mockStorage, _, _ := createTestSHIPLookupService()
+	service, mockStorage := createTestSHIPLookupService()
 
 	mockStorage.On("DeleteSHIPRecord", mock.Anything, "abc123", 0).Return(errors.New("storage error"))
 
@@ -310,7 +300,7 @@ func TestOutputEvicted_StorageError(t *testing.T) {
 // Test Lookup
 
 func TestLookup_LegacyFindAll(t *testing.T) {
-	service, mockStorage, _, _ := createTestSHIPLookupService()
+	service, mockStorage := createTestSHIPLookupService()
 
 	question := types.LookupQuestion{
 		Service: SHIPService,
@@ -331,7 +321,7 @@ func TestLookup_LegacyFindAll(t *testing.T) {
 }
 
 func TestLookup_NilQuery(t *testing.T) {
-	service, _, _, _ := createTestSHIPLookupService()
+	service, _ := createTestSHIPLookupService()
 
 	question := types.LookupQuestion{
 		Service: SHIPService,
@@ -344,7 +334,7 @@ func TestLookup_NilQuery(t *testing.T) {
 }
 
 func TestLookup_WrongService(t *testing.T) {
-	service, _, _, _ := createTestSHIPLookupService()
+	service, _ := createTestSHIPLookupService()
 
 	question := types.LookupQuestion{
 		Service: "ls_other",
@@ -357,7 +347,7 @@ func TestLookup_WrongService(t *testing.T) {
 }
 
 func TestLookup_InvalidStringQuery(t *testing.T) {
-	service, _, _, _ := createTestSHIPLookupService()
+	service, _ := createTestSHIPLookupService()
 
 	question := types.LookupQuestion{
 		Service: SHIPService,
@@ -370,7 +360,7 @@ func TestLookup_InvalidStringQuery(t *testing.T) {
 }
 
 func TestLookup_ObjectQuery_FindAll(t *testing.T) {
-	service, mockStorage, _, _ := createTestSHIPLookupService()
+	service, mockStorage := createTestSHIPLookupService()
 
 	findAll := true
 	limit := 10
@@ -402,7 +392,7 @@ func TestLookup_ObjectQuery_FindAll(t *testing.T) {
 }
 
 func TestLookup_ObjectQuery_SpecificQuery(t *testing.T) {
-	service, mockStorage, _, _ := createTestSHIPLookupService()
+	service, mockStorage := createTestSHIPLookupService()
 
 	domain := "https://example.com"
 	topics := []string{"tm_bridge", "tm_sync"}
@@ -438,7 +428,7 @@ func TestLookup_ObjectQuery_SpecificQuery(t *testing.T) {
 }
 
 func TestLookup_ValidationError_NegativeLimit(t *testing.T) {
-	service, _, _, _ := createTestSHIPLookupService()
+	service, _ := createTestSHIPLookupService()
 
 	query := map[string]interface{}{
 		"limit": -1,
@@ -455,7 +445,7 @@ func TestLookup_ValidationError_NegativeLimit(t *testing.T) {
 }
 
 func TestLookup_ValidationError_NegativeSkip(t *testing.T) {
-	service, _, _, _ := createTestSHIPLookupService()
+	service, _ := createTestSHIPLookupService()
 
 	query := map[string]interface{}{
 		"skip": -1,
@@ -472,7 +462,7 @@ func TestLookup_ValidationError_NegativeSkip(t *testing.T) {
 }
 
 func TestLookup_ValidationError_InvalidSortOrder(t *testing.T) {
-	service, _, _, _ := createTestSHIPLookupService()
+	service, _ := createTestSHIPLookupService()
 
 	query := map[string]interface{}{
 		"sortOrder": "invalid",
@@ -491,7 +481,7 @@ func TestLookup_ValidationError_InvalidSortOrder(t *testing.T) {
 // Test GetDocumentation
 
 func TestGetDocumentation(t *testing.T) {
-	service, _, _, _ := createTestSHIPLookupService()
+	service, _ := createTestSHIPLookupService()
 
 	doc, err := service.GetDocumentation()
 	assert.NoError(t, err)
@@ -503,7 +493,7 @@ func TestGetDocumentation(t *testing.T) {
 // Test GetMetaData
 
 func TestGetMetaData(t *testing.T) {
-	service, _, _, _ := createTestSHIPLookupService()
+	service, _ := createTestSHIPLookupService()
 
 	metadata, err := service.GetMetaData()
 	assert.NoError(t, err)
@@ -517,7 +507,7 @@ func TestGetMetaData(t *testing.T) {
 // Test edge cases and error scenarios
 
 func TestLookup_StorageError(t *testing.T) {
-	service, mockStorage, _, _ := createTestSHIPLookupService()
+	service, mockStorage := createTestSHIPLookupService()
 
 	question := types.LookupQuestion{
 		Service: SHIPService,
@@ -532,23 +522,25 @@ func TestLookup_StorageError(t *testing.T) {
 }
 
 func TestOutputAdmittedByTopic_StorageError(t *testing.T) {
-	service, mockStorage, mockPushDrop, mockUtils := createTestSHIPLookupService()
+	service, mockStorage := createTestSHIPLookupService()
+
+	// Create valid PushDrop script with SHIP data
+	fields := [][]byte{
+		[]byte("SHIP"),                 // Protocol identifier
+		[]byte{0x01, 0x02, 0x03, 0x04}, // Identity key bytes
+		[]byte("https://example.com"),  // Domain
+		[]byte("tm_bridge"),            // Topic
+	}
+	validScript := createValidPushDropScript(fields)
 
 	payload := types.OutputAdmittedByTopic{
 		Mode:          types.AdmissionModeLockingScript,
 		Topic:         SHIPTopic,
-		LockingScript: "deadbeef",
+		LockingScript: validScript,
 		Txid:          "abc123",
 		OutputIndex:   0,
 	}
 
-	pushDropResult := createValidPushDropResult()
-
-	mockPushDrop.On("Decode", "deadbeef").Return(pushDropResult, nil)
-	mockUtils.On("ToUTF8", []byte("SHIP")).Return("SHIP")
-	mockUtils.On("ToHex", []byte{0x01, 0x02, 0x03, 0x04}).Return("01020304")
-	mockUtils.On("ToUTF8", []byte("https://example.com")).Return("https://example.com")
-	mockUtils.On("ToUTF8", []byte("tm_bridge")).Return("tm_bridge")
 	mockStorage.On("StoreSHIPRecord", mock.Anything, "abc123", 0, "01020304", "https://example.com", "tm_bridge").Return(errors.New("storage error"))
 
 	err := service.OutputAdmittedByTopic(context.Background(), payload)
@@ -559,7 +551,7 @@ func TestOutputAdmittedByTopic_StorageError(t *testing.T) {
 // Test complex query scenarios
 
 func TestLookup_ComplexObjectQuery(t *testing.T) {
-	service, mockStorage, _, _ := createTestSHIPLookupService()
+	service, mockStorage := createTestSHIPLookupService()
 
 	domain := "https://example.com"
 	topics := []string{"tm_bridge", "tm_sync", "tm_token"}

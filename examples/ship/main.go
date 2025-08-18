@@ -49,15 +49,10 @@ func ExampleUsage() {
 		log.Fatal("Failed to ensure indexes:", err)
 	}
 
-	// 3. Create mock PushDrop decoder and utils for this example
-	// In production, you would use the real BSV SDK implementations
-	pushDropDecoder := ship.NewMockPushDropDecoder()
-	utils := ship.NewMockUtils()
+	// 3. Create the SHIP lookup service
+	lookupService := ship.NewSHIPLookupService(storage)
 
-	// 4. Create the SHIP lookup service
-	lookupService := ship.NewSHIPLookupService(storage, pushDropDecoder, utils)
-
-	// 5. Example: Handle an output admitted by topic
+	// 4. Example: Handle an output admitted by topic
 	admissionPayload := types.OutputAdmittedByTopic{
 		Mode:          types.AdmissionModeLockingScript,
 		Topic:         "tm_ship",

@@ -5,11 +5,14 @@ package ship
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"reflect"
 
 	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
+	"github.com/bsv-blockchain/go-sdk/script"
+	"github.com/bsv-blockchain/go-sdk/transaction/template/pushdrop"
 )
 
 // Constants for SHIP service configuration
@@ -37,10 +40,6 @@ type SHIPStorageInterface interface {
 type SHIPLookupService struct {
 	// storage is the SHIP storage implementation
 	storage SHIPStorageInterface
-	// pushDropDecoder handles PushDrop locking script decoding
-	pushDropDecoder types.PushDropDecoder
-	// utils provides utility functions for data conversion
-	utils types.Utils
 }
 
 // Compile-time verification that SHIPLookupService implements types.LookupService
@@ -53,16 +52,12 @@ var _ SHIPStorageInterface = (*SHIPStorage)(nil)
 //
 // Parameters:
 //   - storage: The SHIP storage implementation for data persistence
-//   - pushDropDecoder: The PushDrop decoder for parsing locking scripts
-//   - utils: Utility functions for data conversion
 //
 // Returns:
 //   - *SHIPLookupService: A new SHIP lookup service instance
-func NewSHIPLookupService(storage SHIPStorageInterface, pushDropDecoder types.PushDropDecoder, utils types.Utils) *SHIPLookupService {
+func NewSHIPLookupService(storage SHIPStorageInterface) *SHIPLookupService {
 	return &SHIPLookupService{
-		storage:         storage,
-		pushDropDecoder: pushDropDecoder,
-		utils:           utils,
+		storage: storage,
 	}
 }
 
@@ -92,10 +87,16 @@ func (s *SHIPLookupService) OutputAdmittedByTopic(ctx context.Context, payload t
 		return nil // Silently ignore non-SHIP topics
 	}
 
-	// Decode the PushDrop locking script
-	result, err := s.pushDropDecoder.Decode(payload.LockingScript)
+	// Create script from hex string
+	scriptObj, err := script.NewFromHex(payload.LockingScript)
 	if err != nil {
-		return fmt.Errorf("failed to decode PushDrop locking script: %w", err)
+		return fmt.Errorf("failed to create script from hex: %w", err)
+	}
+
+	// Decode the PushDrop locking script
+	result := pushdrop.Decode(scriptObj)
+	if result == nil {
+		return fmt.Errorf("failed to decode PushDrop locking script")
 	}
 
 	// Validate that we have the expected number of fields
@@ -104,14 +105,14 @@ func (s *SHIPLookupService) OutputAdmittedByTopic(ctx context.Context, payload t
 	}
 
 	// Extract and validate fields
-	shipIdentifier := s.utils.ToUTF8(result.Fields[0])
+	shipIdentifier := string(result.Fields[0])
 	if shipIdentifier != SHIPIdentifier {
 		return nil // Silently ignore non-SHIP protocols
 	}
 
-	identityKey := s.utils.ToHex(result.Fields[1])
-	domain := s.utils.ToUTF8(result.Fields[2])
-	topicSupported := s.utils.ToUTF8(result.Fields[3])
+	identityKey := hex.EncodeToString(result.Fields[1])
+	domain := string(result.Fields[2])
+	topicSupported := string(result.Fields[3])
 
 	// Store the SHIP record
 	return s.storage.StoreSHIPRecord(ctx, payload.Txid, payload.OutputIndex, identityKey, domain, topicSupported)

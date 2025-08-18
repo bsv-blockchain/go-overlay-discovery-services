@@ -22,10 +22,8 @@ func createTestSHIPTopicManager() (*SHIPTopicManager, *MockSHIPStorageInterface)
 
 func createTestSHIPTopicManagerWithLookupService() (*SHIPTopicManager, *MockSHIPStorageInterface, *SHIPLookupService) {
 	mockStorage := new(MockSHIPStorageInterface)
-	mockPushDrop := new(TestMockPushDropDecoder)
-	mockUtils := new(TestMockUtils)
 
-	lookupService := NewSHIPLookupService(mockStorage, mockPushDrop, mockUtils)
+	lookupService := NewSHIPLookupService(mockStorage)
 	topicManager := NewSHIPTopicManager(mockStorage, lookupService)
 
 	return topicManager, mockStorage, lookupService
