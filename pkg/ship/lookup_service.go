@@ -283,7 +283,7 @@ func (s *SHIPLookupService) validateQuery(query *types.SHIPQuery) error {
 //   - string: The service documentation in markdown format
 //   - error: Always nil (no errors expected)
 func (s *SHIPLookupService) GetDocumentation() (string, error) {
-	return SHIPDocumentation, nil
+	return LookupDocumentation, nil
 }
 
 // GetMetaData returns the service metadata.

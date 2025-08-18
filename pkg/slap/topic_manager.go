@@ -460,6 +460,7 @@ func (tm *SLAPTopicManager) GetAvailableServices() []string {
 
 	return services
 }
+
 // IdentifyAdmissibleOutputs implements the engine.TopicManager interface
 // For SLAP, this identifies outputs that should be admitted to the overlay
 func (tm *SLAPTopicManager) IdentifyAdmissibleOutputs(ctx context.Context, beef []byte, previousCoins map[uint32]*transaction.TransactionOutput) (overlay.AdmittanceInstructions, error) {
@@ -480,8 +481,7 @@ func (tm *SLAPTopicManager) IdentifyNeededInputs(ctx context.Context, beef []byt
 // GetDocumentation implements the engine.TopicManager interface
 // Returns documentation for the SLAP topic manager
 func (tm *SLAPTopicManager) GetDocumentation() string {
-	return "SLAP (Service Lookup Availability Protocol) topic manager for overlay network services. " +
-		"SLAP enables service lookup and availability tracking across overlay nodes."
+	return TopicManagerDocumentation
 }
 
 // GetMetaData implements the engine.TopicManager interface

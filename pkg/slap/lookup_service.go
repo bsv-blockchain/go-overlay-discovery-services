@@ -283,7 +283,7 @@ func (s *SLAPLookupService) validateQuery(query *types.SLAPQuery) error {
 //   - string: The service documentation in markdown format
 //   - error: Always nil (no errors expected)
 func (s *SLAPLookupService) GetDocumentation() (string, error) {
-	return SLAPDocumentation, nil
+	return LookupDocumentation, nil
 }
 
 // GetMetaData returns the service metadata.

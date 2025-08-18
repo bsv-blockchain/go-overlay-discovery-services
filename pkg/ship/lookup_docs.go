@@ -3,10 +3,10 @@
 // to improve code organization and maintainability.
 package ship
 
-// SHIPDocumentation contains the comprehensive documentation for the SHIP lookup service.
+// LookupDocumentation contains the comprehensive documentation for the SHIP lookup service.
 // This documentation describes how to use the service, including query formats, examples,
 // and important considerations for developers.
-const SHIPDocumentation = `# SHIP Lookup Service
+const LookupDocumentation = `# SHIP Lookup Service
 
 **Protocol Name**: SHIP (Service Host Interconnect Protocol)
 **Lookup Service Name**: ` + "`SHIPLookupService`" + `

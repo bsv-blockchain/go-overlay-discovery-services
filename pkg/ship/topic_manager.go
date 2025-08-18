@@ -393,8 +393,7 @@ func (tm *SHIPTopicManager) IdentifyNeededInputs(ctx context.Context, beef []byt
 // GetDocumentation implements the engine.TopicManager interface
 // Returns documentation for the SHIP topic manager
 func (tm *SHIPTopicManager) GetDocumentation() string {
-	return "SHIP (Service Host Interconnect Protocol) topic manager for overlay network services. " +
-		"SHIP enables service discovery and interconnection between overlay nodes."
+	return TopicManagerDocumentation
 }
 
 // GetMetaData implements the engine.TopicManager interface

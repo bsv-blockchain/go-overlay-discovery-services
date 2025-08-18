@@ -495,7 +495,7 @@ func TestGetDocumentation(t *testing.T) {
 
 	doc, err := service.GetDocumentation()
 	assert.NoError(t, err)
-	assert.Equal(t, SLAPDocumentation, doc)
+	assert.Equal(t, LookupDocumentation, doc)
 	assert.Contains(t, doc, "# SLAP Lookup Service")
 	assert.Contains(t, doc, "Service Lookup Availability Protocol")
 }

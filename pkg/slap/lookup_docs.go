@@ -3,10 +3,10 @@
 // to improve code organization and maintainability.
 package slap
 
-// SLAPDocumentation contains the comprehensive documentation for the SLAP lookup service.
+// LookupDocumentation contains the comprehensive documentation for the SLAP lookup service.
 // This documentation describes how to use the service, including query formats, examples,
 // and important considerations for developers.
-const SLAPDocumentation = `# SLAP Lookup Service
+const LookupDocumentation = `# SLAP Lookup Service
 
 **Protocol Name**: SLAP (Service Lookup Availability Protocol)
 **Lookup Service Name**: ` + "`SLAPLookupService`" + `
