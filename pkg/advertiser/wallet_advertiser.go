@@ -3,11 +3,16 @@
 package advertiser
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
+	"github.com/bsv-blockchain/go-sdk/transaction"
 	"github.com/bsv-blockchain/go-sdk/transaction/template/pushdrop"
+	"github.com/bsv-blockchain/go-sdk/wallet"
+	"github.com/bsv-blockchain/go-wallet-toolbox/pkg/defs"
 	"io"
 	"net/http"
 	"net/url"
@@ -19,7 +24,10 @@ import (
 	oa "github.com/bsv-blockchain/go-overlay-services/pkg/core/advertiser"
 	"github.com/bsv-blockchain/go-sdk/overlay"
 	"github.com/bsv-blockchain/go-sdk/script"
+	toolboxWallet "github.com/bsv-blockchain/go-wallet-toolbox/pkg/wallet"
 )
+
+const AdTokenValue = 1
 
 // WalletAdvertiser implements the Advertiser interface for creating and managing
 // overlay advertisements using a BSV wallet. It supports both SHIP and SLAP protocols
@@ -153,20 +161,87 @@ func (w *WalletAdvertiser) CreateAdvertisements(adsData []*oa.AdvertisementData)
 		}
 	}
 
-	// Create BSV transactions with PushDrop outputs
-	transactions, err := w.createAdvertisementTransactions(adsData)
+	privKey, err := ec.PrivateKeyFromHex(w.privateKey)
 	if err != nil {
-		return overlay.TaggedBEEF{}, fmt.Errorf("failed to create advertisement transactions: %w", err)
+		return overlay.TaggedBEEF{}, fmt.Errorf("failed to create private key from hex: %w", err)
+	}
+	wlt, err := toolboxWallet.New(defs.NetworkMainnet, privKey)
+	if err != nil {
+		return overlay.TaggedBEEF{}, fmt.Errorf("failed to create wallet: %w", err)
+	}
+	protoWallet, err := wallet.NewCompletedProtoWallet(privKey)
+	if err != nil {
+		return overlay.TaggedBEEF{}, fmt.Errorf("failed to create proto wallet: %w", err)
+	}
+	keyDeriver := wallet.NewKeyDeriver(privKey)
+
+	pd := pushdrop.PushDrop{
+		Wallet: protoWallet,
 	}
 
-	// Encode the transactions as BEEF format
-	beefData, err := w.encodeTransactionsAsBEEF(transactions)
+	var outputs []wallet.CreateActionOutput
+	for _, ad := range adsData {
+		if !utils.IsValidTopicOrServiceName(ad.TopicOrServiceName) {
+			return overlay.TaggedBEEF{}, fmt.Errorf("invalid topic or service name: %s", ad.TopicOrServiceName)
+		}
+		var protocol = wallet.Protocol{SecurityLevel: wallet.SecurityLevelEveryAppAndCounterparty}
+		// ad.protocol === 'SHIP' ? 'service host interconnect' : 'service lookup availability'
+		if ad.Protocol == overlay.ProtocolSHIP {
+			protocol.Protocol = "service host interconnect"
+		} else if ad.Protocol == overlay.ProtocolSLAP {
+			protocol.Protocol = "service lookup availability"
+		} else {
+			return overlay.TaggedBEEF{}, fmt.Errorf("unsupported protocol: %s (must be 'SHIP' or 'SLAP')", ad.Protocol)
+		}
+		lockingScript, err := pd.Lock(
+			context.TODO(),
+			[][]byte{
+				[]byte(ad.Protocol),
+				keyDeriver.IdentityKey().ToDER(),
+				[]byte(w.advertisableURI),
+				[]byte(ad.TopicOrServiceName),
+			},
+			protocol,
+			"1",
+			wallet.Counterparty{Type: wallet.CounterpartyTypeAnyone},
+			true, // forSelf
+			true, // includeSignature
+			pushdrop.LockBefore,
+		)
+		if err != nil {
+			return overlay.TaggedBEEF{}, fmt.Errorf("failed to create locking script: %w", err)
+		}
+		outputs = append(outputs, wallet.CreateActionOutput{
+			OutputDescription: fmt.Sprintf("%s advertisement of %s", ad.Protocol, ad.TopicOrServiceName),
+			Satoshis:          AdTokenValue,
+			LockingScript:     lockingScript.Bytes(),
+		})
+	}
+
+	createActionResult, err := protoWallet.CreateAction(context.TODO(), wallet.CreateActionArgs{
+		Outputs:     outputs,
+		Description: "SHIP/SLAP Advertisement Issuance",
+	}, "")
 	if err != nil {
-		return overlay.TaggedBEEF{}, fmt.Errorf("failed to encode transactions as BEEF: %w", err)
+		return overlay.TaggedBEEF{}, fmt.Errorf("failed to create action for advertisements: %w", err)
+	}
+
+	tx, err := transaction.NewTransactionFromBytes(createActionResult.Tx)
+	if err != nil {
+		return overlay.TaggedBEEF{}, fmt.Errorf("failed to create transaction from tx: %w", err)
+	}
+
+	beef, err := transaction.NewBeefFromTransaction(tx)
+	if err != nil {
+		return overlay.TaggedBEEF{}, fmt.Errorf("failed to create BEEF from transaction: %w", err)
+	}
+	beefBytes, err := beef.Bytes()
+	if err != nil {
+		return overlay.TaggedBEEF{}, fmt.Errorf("failed to encode BEEF: %w", err)
 	}
 
 	return overlay.TaggedBEEF{
-		Beef:   beefData,
+		Beef:   beefBytes,
 		Topics: topics,
 	}, nil
 }
@@ -470,92 +545,6 @@ func (w *WalletAdvertiser) setupCryptographicContexts() error {
 	return nil
 }
 
-// createAdvertisementTransactions creates BSV transactions for the given advertisement data
-func (w *WalletAdvertiser) createAdvertisementTransactions(adsData []*oa.AdvertisementData) ([]*Transaction, error) {
-	var transactions []*Transaction
-
-	for _, adData := range adsData {
-		tx, err := w.createSingleAdvertisementTransaction(adData)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create transaction for %s advertisement: %w", adData.Protocol, err)
-		}
-		transactions = append(transactions, tx)
-	}
-
-	return transactions, nil
-}
-
-// createSingleAdvertisementTransaction creates a single advertisement transaction
-func (w *WalletAdvertiser) createSingleAdvertisementTransaction(adData *oa.AdvertisementData) (*Transaction, error) {
-	// Create PushDrop locking script for the advertisement
-	lockingScript, err := w.createPushDropScript(adData)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create PushDrop script: %w", err)
-	}
-
-	// Create a transaction with a single output containing the advertisement
-	tx := &Transaction{
-		Version: 1,
-		Inputs:  []TransactionInput{w.createDummyInput()}, // Placeholder input
-		Outputs: []TransactionOutput{
-			{
-				Value:         1, // Minimal satoshi value
-				LockingScript: lockingScript,
-			},
-		},
-		LockTime: 0,
-	}
-
-	return tx, nil
-}
-
-// createPushDropScript creates a PushDrop locking script for the advertisement
-func (w *WalletAdvertiser) createPushDropScript(adData *oa.AdvertisementData) ([]byte, error) {
-	// Derive identity key from private key (simplified approach)
-	identityKey, err := w.deriveIdentityKey()
-	if err != nil {
-		return nil, fmt.Errorf("failed to derive identity key: %w", err)
-	}
-
-	// Create PushDrop fields based on the protocol
-	var fields [][]byte
-
-	// Field 0: Protocol identifier
-	fields = append(fields, []byte(string(adData.Protocol)))
-
-	// Field 1: Identity key (derived from private key)
-	identityKeyBytes, err := hex.DecodeString(identityKey)
-	if err != nil {
-		return nil, fmt.Errorf("invalid identity key hex: %w", err)
-	}
-	fields = append(fields, identityKeyBytes)
-
-	// Field 2: Domain (extract from advertisableURI)
-	domain, err := w.extractDomainFromURI()
-	if err != nil {
-		return nil, fmt.Errorf("failed to extract domain: %w", err)
-	}
-	fields = append(fields, []byte(domain))
-
-	// Field 3: Topic or service name
-	fields = append(fields, []byte(adData.TopicOrServiceName))
-
-	// Field 4: Signature (placeholder - in real implementation this would be a proper signature)
-	signature, err := w.createSignature(fields)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create signature: %w", err)
-	}
-	fields = append(fields, signature)
-
-	// Build the PushDrop script
-	script, err := w.buildPushDropScript(fields)
-	if err != nil {
-		return nil, fmt.Errorf("failed to build PushDrop script: %w", err)
-	}
-
-	return script, nil
-}
-
 // deriveIdentityKey derives an identity key from the private key (simplified implementation)
 func (w *WalletAdvertiser) deriveIdentityKey() (string, error) {
 	// In a real implementation, this would use proper key derivation
@@ -632,69 +621,6 @@ func (w *WalletAdvertiser) createSignature(fields [][]byte) ([]byte, error) {
 	}
 
 	return signature, nil
-}
-
-// buildPushDropScript builds a PushDrop locking script from the fields
-func (w *WalletAdvertiser) buildPushDropScript(fields [][]byte) ([]byte, error) {
-	var script []byte
-
-	for _, field := range fields {
-		// Add push data opcode
-		if len(field) <= 75 {
-			// OP_PUSHDATA with length
-			script = append(script, byte(len(field)))
-		} else if len(field) <= 255 {
-			// OP_PUSHDATA1
-			script = append(script, 0x4c, byte(len(field)))
-		} else if len(field) <= 65535 {
-			// OP_PUSHDATA2
-			script = append(script, 0x4d)
-			script = append(script, byte(len(field)&0xff), byte(len(field)>>8))
-		} else {
-			return nil, fmt.Errorf("field too large: %d bytes", len(field))
-		}
-
-		// Add field data
-		script = append(script, field...)
-	}
-
-	// Add OP_DROP operations for each field except the last one
-	for i := 0; i < len(fields)-1; i++ {
-		script = append(script, 0x75) // OP_DROP
-	}
-
-	// Add final operations (simplified PushDrop pattern)
-	script = append(script, 0x76) // OP_DUP
-	script = append(script, 0xa9) // OP_HASH160
-
-	// Add 20-byte placeholder hash (in real implementation, this would be proper)
-	placeholderHash := make([]byte, 20)
-	for i := range placeholderHash {
-		placeholderHash[i] = byte(i % 256)
-	}
-	script = append(script, 0x14) // Push 20 bytes
-	script = append(script, placeholderHash...)
-
-	script = append(script, 0x88) // OP_EQUALVERIFY
-	script = append(script, 0xac) // OP_CHECKSIG
-
-	return script, nil
-}
-
-// createDummyInput creates a placeholder transaction input
-func (w *WalletAdvertiser) createDummyInput() TransactionInput {
-	// Create a dummy previous transaction hash
-	var prevHash [32]byte
-	copy(prevHash[:], []byte("dummyhash00000000000000000000000"))
-
-	return TransactionInput{
-		PreviousOutput: OutPoint{
-			Hash:  prevHash,
-			Index: 0,
-		},
-		ScriptSig: []byte{0x00}, // Empty signature script
-		Sequence:  0xffffffff,   // Standard sequence
-	}
 }
 
 // encodeTransactionsAsBEEF encodes transactions in BEEF (Binary Extensible Exchange Format)

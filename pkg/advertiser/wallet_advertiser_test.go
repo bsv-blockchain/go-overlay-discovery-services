@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
-	overlayAdvertiser "github.com/bsv-blockchain/go-overlay-services/pkg/core/advertiser"
+	oa "github.com/bsv-blockchain/go-overlay-services/pkg/core/advertiser"
 	"github.com/bsv-blockchain/go-sdk/overlay"
 	"github.com/bsv-blockchain/go-sdk/script"
 	"github.com/stretchr/testify/assert"
@@ -151,38 +151,38 @@ func TestWalletAdvertiser_CreateAdvertisements(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		adsData       []*overlayAdvertiser.AdvertisementData
+		adsData       []*oa.AdvertisementData
 		expectedError string
 		shouldFail    bool
 	}{
 		{
 			name: "Valid SHIP advertisement",
-			adsData: []*overlayAdvertiser.AdvertisementData{
+			adsData: []*oa.AdvertisementData{
 				{
 					Protocol:           overlay.ProtocolSHIP,
-					TopicOrServiceName: "payments",
+					TopicOrServiceName: "tm_ship",
 				},
 			},
 			shouldFail: false, // Implementation is now complete
 		},
 		{
 			name: "Valid SLAP advertisement",
-			adsData: []*overlayAdvertiser.AdvertisementData{
+			adsData: []*oa.AdvertisementData{
 				{
 					Protocol:           overlay.ProtocolSLAP,
-					TopicOrServiceName: "identity_verification",
+					TopicOrServiceName: "tm_meter",
 				},
 			},
 			shouldFail: false, // Implementation is now complete
 		},
 		{
 			name:          "Empty advertisements array",
-			adsData:       []*overlayAdvertiser.AdvertisementData{},
+			adsData:       []*oa.AdvertisementData{},
 			expectedError: "at least one advertisement data entry is required",
 		},
 		{
 			name: "Empty topic name",
-			adsData: []*overlayAdvertiser.AdvertisementData{
+			adsData: []*oa.AdvertisementData{
 				{
 					Protocol:           overlay.ProtocolSHIP,
 					TopicOrServiceName: "",
@@ -192,7 +192,7 @@ func TestWalletAdvertiser_CreateAdvertisements(t *testing.T) {
 		},
 		{
 			name: "Invalid topic name",
-			adsData: []*overlayAdvertiser.AdvertisementData{
+			adsData: []*oa.AdvertisementData{
 				{
 					Protocol:           overlay.ProtocolSHIP,
 					TopicOrServiceName: "Invalid-Name",
@@ -267,13 +267,13 @@ func TestWalletAdvertiser_RevokeAdvertisements(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		advertisements []*overlayAdvertiser.Advertisement
+		advertisements []*oa.Advertisement
 		expectedError  string
 		shouldFail     bool
 	}{
 		{
 			name: "Valid advertisement with BEEF",
-			advertisements: []*overlayAdvertiser.Advertisement{
+			advertisements: []*oa.Advertisement{
 				{
 					Protocol:       overlay.ProtocolSHIP,
 					IdentityKey:    "test-key",
@@ -287,12 +287,12 @@ func TestWalletAdvertiser_RevokeAdvertisements(t *testing.T) {
 		},
 		{
 			name:           "Empty advertisements array",
-			advertisements: []*overlayAdvertiser.Advertisement{},
+			advertisements: []*oa.Advertisement{},
 			expectedError:  "at least one advertisement is required for revocation",
 		},
 		{
 			name: "Advertisement missing BEEF",
-			advertisements: []*overlayAdvertiser.Advertisement{
+			advertisements: []*oa.Advertisement{
 				{
 					Protocol:       overlay.ProtocolSHIP,
 					IdentityKey:    "test-key",
@@ -305,7 +305,7 @@ func TestWalletAdvertiser_RevokeAdvertisements(t *testing.T) {
 		},
 		{
 			name: "Advertisement missing output index",
-			advertisements: []*overlayAdvertiser.Advertisement{
+			advertisements: []*oa.Advertisement{
 				{
 					Protocol:       overlay.ProtocolSHIP,
 					IdentityKey:    "test-key",
@@ -356,7 +356,7 @@ func TestWalletAdvertiser_ParseAdvertisement(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create an advertisement first (matching TypeScript test)
-		adsData := []*overlayAdvertiser.AdvertisementData{
+		adsData := []*oa.AdvertisementData{
 			{
 				Protocol:           overlay.ProtocolSHIP,
 				TopicOrServiceName: "tm_meter",
@@ -402,7 +402,7 @@ func TestWalletAdvertiser_MethodsRequireInitialization(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test that methods fail when not initialized
-	_, err = advertiser.CreateAdvertisements([]*overlayAdvertiser.AdvertisementData{{Protocol: overlay.ProtocolSHIP, TopicOrServiceName: "test"}})
+	_, err = advertiser.CreateAdvertisements([]*oa.AdvertisementData{{Protocol: overlay.ProtocolSHIP, TopicOrServiceName: "test"}})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "WalletAdvertiser must be initialized")
 
@@ -410,7 +410,7 @@ func TestWalletAdvertiser_MethodsRequireInitialization(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "WalletAdvertiser must be initialized")
 
-	_, err = advertiser.RevokeAdvertisements([]*overlayAdvertiser.Advertisement{{Protocol: overlay.ProtocolSHIP}})
+	_, err = advertiser.RevokeAdvertisements([]*oa.Advertisement{{Protocol: overlay.ProtocolSHIP}})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "WalletAdvertiser must be initialized")
 
