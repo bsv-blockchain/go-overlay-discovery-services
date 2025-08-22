@@ -12,19 +12,19 @@ import (
 
 // Test helper functions
 
-func createTestSHIPTopicManager() (*SHIPTopicManager, *MockSHIPStorageInterface) {
-	mockStorage := new(MockSHIPStorageInterface)
+func createTestSHIPTopicManager() (*TopicManager, *MockStorage) {
+	mockStorage := new(MockStorage)
 
-	topicManager := NewSHIPTopicManager(mockStorage, nil)
+	topicManager := NewTopicManager(mockStorage, nil)
 
 	return topicManager, mockStorage
 }
 
-func createTestSHIPTopicManagerWithLookupService() (*SHIPTopicManager, *MockSHIPStorageInterface, *SHIPLookupService) {
-	mockStorage := new(MockSHIPStorageInterface)
+func createTestSHIPTopicManagerWithLookupService() (*TopicManager, *MockStorage, *LookupService) {
+	mockStorage := new(MockStorage)
 
-	lookupService := NewSHIPLookupService(mockStorage)
-	topicManager := NewSHIPTopicManager(mockStorage, lookupService)
+	lookupService := NewLookupService(mockStorage)
+	topicManager := NewTopicManager(mockStorage, lookupService)
 
 	return topicManager, mockStorage, lookupService
 }
@@ -49,12 +49,12 @@ func createMockHandler(called *bool, shouldError bool) TopicMessageHandler {
 	}
 }
 
-// Test NewSHIPTopicManager
+// Test NewTopicManager
 
 func TestNewSHIPTopicManager(t *testing.T) {
-	mockStorage := new(MockSHIPStorageInterface)
+	mockStorage := new(MockStorage)
 
-	topicManager := NewSHIPTopicManager(mockStorage, nil)
+	topicManager := NewTopicManager(mockStorage, nil)
 
 	assert.NotNil(t, topicManager)
 	assert.Equal(t, mockStorage, topicManager.storage)
@@ -478,7 +478,7 @@ func TestGetTopicManagerMetaData(t *testing.T) {
 	metadata := topicManager.GetTopicManagerMetaData()
 
 	assert.Equal(t, "SHIP Topic Manager", metadata.Name)
-	assert.Equal(t, "Manages overlay network topic subscriptions for SHIP protocol.", metadata.ShortDescription)
+	assert.Equal(t, "Manages overlay network topic subscriptions for SHIP protocol.", metadata.Description)
 }
 
 func TestGetActiveTopicCount(t *testing.T) {

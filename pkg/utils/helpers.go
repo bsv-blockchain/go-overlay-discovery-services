@@ -144,12 +144,12 @@ func flattenFields(fields TokenFields) []byte {
 	return result
 }
 
-// UTFBytesToString converts UTF-8 bytes to string (equivalent to Utils.toUTF8 in TypeScript)
+// UTFBytesToString converts UTF-8 bytes to string
 func UTFBytesToString(data []byte) string {
 	return string(data)
 }
 
-// BytesToHex converts bytes to hex string (equivalent to Utils.toHex in TypeScript)
+// BytesToHex converts bytes to hex string
 func BytesToHex(data []byte) string {
 	return hex.EncodeToString(data)
 }

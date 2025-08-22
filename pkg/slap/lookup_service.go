@@ -1,6 +1,5 @@
 // Package slap implements the SLAP (Service Lookup Availability Protocol) lookup service functionality.
-// This package provides Go equivalents for the TypeScript SLAPLookupService class, implementing
-// the BSV overlay LookupService interface.
+// The BSV overlay LookupService interface.
 package slap
 
 import (
@@ -21,46 +20,28 @@ import (
 
 // Constants for SLAP service configuration
 const (
-	// SLAPTopic is the topic manager topic for SLAP advertisements
-	SLAPTopic = "tm_slap"
-	// SLAPService is the lookup service identifier for SLAP
-	SLAPService = "ls_slap"
-	// SLAPIdentifier is the protocol identifier expected in PushDrop fields
-	SLAPIdentifier = "SLAP"
+	// Topic is the topic manager topic for SLAP advertisements
+	Topic = "tm_slap"
+	// Service is the lookup service identifier for SLAP
+	Service = "ls_slap"
+	// Identifier is the protocol identifier expected in PushDrop fields
+	Identifier = "SLAP"
 )
 
-// SLAPStorageInterface defines the interface for SLAP storage operations
-type SLAPStorageInterface interface {
-	StoreSLAPRecord(ctx context.Context, txid string, outputIndex int, identityKey, domain, service string) error
-	DeleteSLAPRecord(ctx context.Context, txid string, outputIndex int) error
-	FindRecord(ctx context.Context, query types.SLAPQuery) ([]types.UTXOReference, error)
-	FindAll(ctx context.Context, limit, skip *int, sortOrder *types.SortOrder) ([]types.UTXOReference, error)
-	EnsureIndexes(ctx context.Context) error
-}
-
-// SLAPLookupService implements the BSV overlay LookupService interface for SLAP protocol.
+// LookupService implements the BSV overlay LookupService interface for SLAP protocol.
 // It provides lookup capabilities for SLAP tokens within the overlay network,
 // allowing discovery of nodes that offer specific services.
-type SLAPLookupService struct {
+type LookupService struct {
 	// storage is the SLAP storage implementation
-	storage SLAPStorageInterface
+	storage StorageInterface
 }
 
-// Compile-time verification that SLAPLookupService implements engine.LookupService
-var _ engine.LookupService = (*SLAPLookupService)(nil)
+// Compile-time verification that LookupService implements engine.LookupService
+var _ engine.LookupService = (*LookupService)(nil)
 
-// Compile-time verification that SLAPStorage implements SLAPStorageInterface
-var _ SLAPStorageInterface = (*SLAPStorage)(nil)
-
-// NewSLAPLookupService creates a new SLAP lookup service instance.
-//
-// Parameters:
-//   - storage: The SLAP storage implementation for data persistence
-//
-// Returns:
-//   - *SLAPLookupService: A new SLAP lookup service instance
-func NewSLAPLookupService(storage SLAPStorageInterface) *SLAPLookupService {
-	return &SLAPLookupService{
+// NewLookupService creates a new SLAP lookup service instance.
+func NewLookupService(storage StorageInterface) *LookupService {
+	return &LookupService{
 		storage: storage,
 	}
 }
@@ -74,15 +55,9 @@ func NewSLAPLookupService(storage SLAPStorageInterface) *SLAPLookupService {
 //   - fields[1]: Identity key in hex format
 //   - fields[2]: Domain string
 //   - fields[3]: Service name supported
-//
-// Parameters:
-//   - payload: The output admission payload containing topic, locking script, and UTXO reference
-//
-// Returns:
-//   - error: An error if processing fails, nil otherwise
-func (s *SLAPLookupService) OutputAdmittedByTopic(ctx context.Context, payload *engine.OutputAdmittedByTopic) error {
+func (s *LookupService) OutputAdmittedByTopic(ctx context.Context, payload *engine.OutputAdmittedByTopic) error {
 	// Only process SLAP topic
-	if payload.Topic != SLAPTopic {
+	if payload.Topic != Topic {
 		return nil // Silently ignore non-SLAP topics
 	}
 
@@ -102,7 +77,7 @@ func (s *SLAPLookupService) OutputAdmittedByTopic(ctx context.Context, payload *
 
 	// Extract and validate fields
 	slapIdentifier := string(result.Fields[0])
-	if slapIdentifier != SLAPIdentifier {
+	if slapIdentifier != Identifier {
 		return nil // Silently ignore non-SLAP protocols
 	}
 
@@ -117,15 +92,9 @@ func (s *SLAPLookupService) OutputAdmittedByTopic(ctx context.Context, payload *
 
 // OutputSpent handles an output being spent.
 // This method removes the corresponding SLAP record when the UTXO is spent.
-//
-// Parameters:
-//   - payload: The spent output payload containing topic and UTXO reference
-//
-// Returns:
-//   - error: An error if processing fails, nil otherwise
-func (s *SLAPLookupService) OutputSpent(ctx context.Context, payload *engine.OutputSpent) error {
+func (s *LookupService) OutputSpent(ctx context.Context, payload *engine.OutputSpent) error {
 	// Only process SLAP topic
-	if payload.Topic != SLAPTopic {
+	if payload.Topic != Topic {
 		return nil // Silently ignore non-SLAP topics
 	}
 
@@ -136,14 +105,7 @@ func (s *SLAPLookupService) OutputSpent(ctx context.Context, payload *engine.Out
 
 // OutputEvicted handles an output being evicted.
 // This method removes the corresponding SLAP record when the UTXO is evicted from the mempool.
-//
-// Parameters:
-//   - txid: The transaction ID of the evicted output
-//   - outputIndex: The index of the evicted output within the transaction
-//
-// Returns:
-//   - error: An error if processing fails, nil otherwise
-func (s *SLAPLookupService) OutputEvicted(ctx context.Context, outpoint *transaction.Outpoint) error {
+func (s *LookupService) OutputEvicted(ctx context.Context, outpoint *transaction.Outpoint) error {
 	// Delete the SLAP record
 	txid := hex.EncodeToString(outpoint.Txid[:])
 	return s.storage.DeleteSLAPRecord(ctx, txid, int(outpoint.Index))
@@ -152,7 +114,7 @@ func (s *SLAPLookupService) OutputEvicted(ctx context.Context, outpoint *transac
 // OutputNoLongerRetainedInHistory handles outputs no longer retained in history.
 // Called when a Topic Manager decides that historical retention of the specified UTXO is no longer required.
 // For SLAP discovery services, this is typically a no-op as they don't maintain historical retention.
-func (s *SLAPLookupService) OutputNoLongerRetainedInHistory(ctx context.Context, outpoint *transaction.Outpoint, topic string) error {
+func (s *LookupService) OutputNoLongerRetainedInHistory(ctx context.Context, outpoint *transaction.Outpoint, topic string) error {
 	// Discovery services don't have the concept of historical retention, so we ignore it
 	return nil
 }
@@ -160,7 +122,7 @@ func (s *SLAPLookupService) OutputNoLongerRetainedInHistory(ctx context.Context,
 // OutputBlockHeightUpdated handles block height updates for transactions.
 // Called when the block height of a transaction is updated (e.g., when a transaction is included in a block).
 // For SLAP discovery services, this is typically a no-op as they don't track block heights.
-func (s *SLAPLookupService) OutputBlockHeightUpdated(ctx context.Context, txid *chainhash.Hash, blockHeight uint32, blockIndex uint64) error {
+func (s *LookupService) OutputBlockHeightUpdated(ctx context.Context, txid *chainhash.Hash, blockHeight uint32, blockIndex uint64) error {
 	// Discovery services don't handle block height updates, so we ignore it
 	return nil
 }
@@ -172,21 +134,14 @@ func (s *SLAPLookupService) OutputBlockHeightUpdated(ctx context.Context, txid *
 // Supported query formats:
 //   - String "findAll": Returns all SLAP records
 //   - Object with SLAPQuery fields: Filters by domain, service, identityKey with pagination
-//
-// Parameters:
-//   - question: The lookup question containing service identifier and query parameters
-//
-// Returns:
-//   - types.LookupAnswer: Matching UTXO references
-//   - error: An error if the query fails or is invalid, nil otherwise
-func (s *SLAPLookupService) Lookup(ctx context.Context, question *lookup.LookupQuestion) (*lookup.LookupAnswer, error) {
+func (s *LookupService) Lookup(ctx context.Context, question *lookup.LookupQuestion) (*lookup.LookupAnswer, error) {
 	// Validate required fields
 	if len(question.Query) == 0 {
 		return nil, fmt.Errorf("a valid query must be provided")
 	}
 
-	if question.Service != SLAPService {
-		return nil, fmt.Errorf("lookup service not supported: expected '%s', got '%s'", SLAPService, question.Service)
+	if question.Service != Service {
+		return nil, fmt.Errorf("lookup service not supported: expected '%s', got '%s'", Service, question.Service)
 	}
 
 	// Parse the query from JSON
@@ -230,7 +185,7 @@ func (s *SLAPLookupService) Lookup(ctx context.Context, question *lookup.LookupQ
 }
 
 // parseQueryObject parses and validates a query object
-func (s *SLAPLookupService) parseQueryObject(query interface{}) (*types.SLAPQuery, error) {
+func (s *LookupService) parseQueryObject(query interface{}) (*types.SLAPQuery, error) {
 	// Convert to JSON and back to ensure proper type mapping
 	jsonBytes, err := json.Marshal(query)
 	if err != nil {
@@ -251,7 +206,7 @@ func (s *SLAPLookupService) parseQueryObject(query interface{}) (*types.SLAPQuer
 }
 
 // validateQuery validates the query parameters
-func (s *SLAPLookupService) validateQuery(query *types.SLAPQuery) error {
+func (s *LookupService) validateQuery(query *types.SLAPQuery) error {
 	// Validate domain parameter
 	if query.Domain != nil {
 		if reflect.TypeOf(query.Domain).Kind() != reflect.Ptr ||
@@ -302,22 +257,14 @@ func (s *SLAPLookupService) validateQuery(query *types.SLAPQuery) error {
 // GetDocumentation returns the service documentation.
 // This method provides comprehensive documentation about the SLAP lookup service,
 // including usage examples and best practices.
-//
-// Returns:
-//   - string: The service documentation in markdown format
-//   - error: Always nil (no errors expected)
-func (s *SLAPLookupService) GetDocumentation() string {
+func (s *LookupService) GetDocumentation() string {
 	return LookupDocumentation
 }
 
 // GetMetaData returns the service metadata.
 // This method provides basic information about the SLAP lookup service
 // including name and description.
-//
-// Returns:
-//   - types.MetaData: The service metadata
-//   - error: Always nil (no errors expected)
-func (s *SLAPLookupService) GetMetaData() *overlay.MetaData {
+func (s *LookupService) GetMetaData() *overlay.MetaData {
 	return &overlay.MetaData{
 		Name:        "SLAP Lookup Service",
 		Description: "Provides lookup capabilities for SLAP tokens.",
@@ -325,7 +272,7 @@ func (s *SLAPLookupService) GetMetaData() *overlay.MetaData {
 }
 
 // convertUTXOsToLookupAnswer converts a slice of UTXO references to a LookupAnswer
-func (s *SLAPLookupService) convertUTXOsToLookupAnswer(utxos []types.UTXOReference) *lookup.LookupAnswer {
+func (s *LookupService) convertUTXOsToLookupAnswer(utxos []types.UTXOReference) *lookup.LookupAnswer {
 	// For discovery services, we return the UTXOs as freeform result
 	return &lookup.LookupAnswer{
 		Type:   lookup.AnswerTypeFreeform,

@@ -22,32 +22,32 @@ const TxId = "bdf1e48e845a65ba8c139c9b94844de30716f38d53787ba0a435e8705c4216d5"
 
 // Mock implementations for testing
 
-// MockSLAPStorageInterface is a mock implementation of SLAPStorage interface methods
-type MockSLAPStorageInterface struct {
+// MockStorage is a mock implementation of Storage interface methods
+type MockStorage struct {
 	mock.Mock
 }
 
-func (m *MockSLAPStorageInterface) StoreSLAPRecord(ctx context.Context, txid string, outputIndex int, identityKey, domain, service string) error {
+func (m *MockStorage) StoreSLAPRecord(ctx context.Context, txid string, outputIndex int, identityKey, domain, service string) error {
 	args := m.Called(ctx, txid, outputIndex, identityKey, domain, service)
 	return args.Error(0)
 }
 
-func (m *MockSLAPStorageInterface) DeleteSLAPRecord(ctx context.Context, txid string, outputIndex int) error {
+func (m *MockStorage) DeleteSLAPRecord(ctx context.Context, txid string, outputIndex int) error {
 	args := m.Called(ctx, txid, outputIndex)
 	return args.Error(0)
 }
 
-func (m *MockSLAPStorageInterface) FindRecord(ctx context.Context, query types.SLAPQuery) ([]types.UTXOReference, error) {
+func (m *MockStorage) FindRecord(ctx context.Context, query types.SLAPQuery) ([]types.UTXOReference, error) {
 	args := m.Called(ctx, query)
 	return args.Get(0).([]types.UTXOReference), args.Error(1)
 }
 
-func (m *MockSLAPStorageInterface) FindAll(ctx context.Context, limit, skip *int, sortOrder *types.SortOrder) ([]types.UTXOReference, error) {
+func (m *MockStorage) FindAll(ctx context.Context, limit, skip *int, sortOrder *types.SortOrder) ([]types.UTXOReference, error) {
 	args := m.Called(ctx, limit, skip, sortOrder)
 	return args.Get(0).([]types.UTXOReference), args.Error(1)
 }
 
-func (m *MockSLAPStorageInterface) EnsureIndexes(ctx context.Context) error {
+func (m *MockStorage) EnsureIndexes(ctx context.Context) error {
 	args := m.Called(ctx)
 	return args.Error(0)
 }
@@ -56,9 +56,9 @@ func (m *MockSLAPStorageInterface) EnsureIndexes(ctx context.Context) error {
 
 // Test helper functions
 
-func createTestSLAPLookupService() (*SLAPLookupService, *MockSLAPStorageInterface) {
-	mockStorage := new(MockSLAPStorageInterface)
-	service := NewSLAPLookupService(mockStorage)
+func createTestSLAPLookupService() (*LookupService, *MockStorage) {
+	mockStorage := new(MockStorage)
+	service := NewLookupService(mockStorage)
 	return service, mockStorage
 }
 
@@ -97,12 +97,12 @@ func createValidPushDropScript(fields [][]byte) string {
 
 // createValidPushDropResult helper removed - using real PushDrop scripts instead
 
-// Test NewSLAPLookupService
+// Test NewLookupService
 
 func TestNewSLAPLookupService(t *testing.T) {
-	mockStorage := new(MockSLAPStorageInterface)
+	mockStorage := new(MockStorage)
 
-	service := NewSLAPLookupService(mockStorage)
+	service := NewLookupService(mockStorage)
 
 	assert.NotNil(t, service)
 	assert.Equal(t, mockStorage, service.storage)
@@ -136,7 +136,7 @@ func TestOutputAdmittedByTopic_Success(t *testing.T) {
 	}
 
 	payload := &engine.OutputAdmittedByTopic{
-		Topic:         SLAPTopic,
+		Topic:         Topic,
 		Outpoint:      outpoint,
 		LockingScript: scriptObj,
 	}
@@ -199,7 +199,7 @@ func TestOutputAdmittedByTopic_PushDropDecodeError(t *testing.T) {
 	}
 
 	payload := &engine.OutputAdmittedByTopic{
-		Topic:         SLAPTopic,
+		Topic:         Topic,
 		Outpoint:      outpoint,
 		LockingScript: scriptObj,
 	}
@@ -233,7 +233,7 @@ func TestOutputAdmittedByTopic_InsufficientFields(t *testing.T) {
 	}
 
 	payload := &engine.OutputAdmittedByTopic{
-		Topic:         SLAPTopic,
+		Topic:         Topic,
 		Outpoint:      outpoint,
 		LockingScript: scriptObj,
 	}
@@ -269,7 +269,7 @@ func TestOutputAdmittedByTopic_IgnoreNonSLAPProtocol(t *testing.T) {
 	}
 
 	payload := &engine.OutputAdmittedByTopic{
-		Topic:         SLAPTopic,
+		Topic:         Topic,
 		Outpoint:      outpoint,
 		LockingScript: scriptObj,
 	}
@@ -295,7 +295,7 @@ func TestOutputSpent_Success(t *testing.T) {
 	}
 
 	payload := &engine.OutputSpent{
-		Topic:    SLAPTopic,
+		Topic:    Topic,
 		Outpoint: outpoint,
 	}
 
@@ -379,7 +379,7 @@ func TestLookup_LegacyFindAll(t *testing.T) {
 	service, mockStorage := createTestSLAPLookupService()
 
 	question := &lookup.LookupQuestion{
-		Service: SLAPService,
+		Service: Service,
 		Query:   json.RawMessage(`"findAll"`),
 	}
 
@@ -405,7 +405,7 @@ func TestLookup_NilQuery(t *testing.T) {
 	service, _ := createTestSLAPLookupService()
 
 	question := &lookup.LookupQuestion{
-		Service: SLAPService,
+		Service: Service,
 		Query:   json.RawMessage{},
 	}
 
@@ -431,7 +431,7 @@ func TestLookup_InvalidStringQuery(t *testing.T) {
 	service, _ := createTestSLAPLookupService()
 
 	question := &lookup.LookupQuestion{
-		Service: SLAPService,
+		Service: Service,
 		Query:   json.RawMessage(`"invalid"`),
 	}
 
@@ -457,7 +457,7 @@ func TestLookup_ObjectQuery_FindAll(t *testing.T) {
 
 	queryJSON, _ := json.Marshal(query)
 	question := &lookup.LookupQuestion{
-		Service: SLAPService,
+		Service: Service,
 		Query:   queryJSON,
 	}
 
@@ -493,7 +493,7 @@ func TestLookup_ObjectQuery_SpecificQuery(t *testing.T) {
 
 	queryJSON, _ := json.Marshal(query)
 	question := &lookup.LookupQuestion{
-		Service: SLAPService,
+		Service: Service,
 		Query:   queryJSON,
 	}
 
@@ -529,7 +529,7 @@ func TestLookup_ValidationError_NegativeLimit(t *testing.T) {
 
 	queryJSON, _ := json.Marshal(query)
 	question := &lookup.LookupQuestion{
-		Service: SLAPService,
+		Service: Service,
 		Query:   queryJSON,
 	}
 
@@ -547,7 +547,7 @@ func TestLookup_ValidationError_NegativeSkip(t *testing.T) {
 
 	queryJSON, _ := json.Marshal(query)
 	question := &lookup.LookupQuestion{
-		Service: SLAPService,
+		Service: Service,
 		Query:   queryJSON,
 	}
 
@@ -565,7 +565,7 @@ func TestLookup_ValidationError_InvalidSortOrder(t *testing.T) {
 
 	queryJSON, _ := json.Marshal(query)
 	question := &lookup.LookupQuestion{
-		Service: SLAPService,
+		Service: Service,
 		Query:   queryJSON,
 	}
 
@@ -601,7 +601,7 @@ func TestLookup_StorageError(t *testing.T) {
 	service, mockStorage := createTestSLAPLookupService()
 
 	question := &lookup.LookupQuestion{
-		Service: SLAPService,
+		Service: Service,
 		Query:   json.RawMessage(`"findAll"`),
 	}
 
@@ -638,7 +638,7 @@ func TestOutputAdmittedByTopic_StorageError(t *testing.T) {
 	}
 
 	payload := &engine.OutputAdmittedByTopic{
-		Topic:         SLAPTopic,
+		Topic:         Topic,
 		Outpoint:      outpoint,
 		LockingScript: scriptObj,
 	}
@@ -673,7 +673,7 @@ func TestLookup_ComplexObjectQuery(t *testing.T) {
 
 	queryJSON, _ := json.Marshal(query)
 	question := &lookup.LookupQuestion{
-		Service: SLAPService,
+		Service: Service,
 		Query:   queryJSON,
 	}
 
@@ -718,7 +718,7 @@ func TestLookup_ServiceOnlyQuery(t *testing.T) {
 
 	queryJSON, _ := json.Marshal(query)
 	question := &lookup.LookupQuestion{
-		Service: SLAPService,
+		Service: Service,
 		Query:   queryJSON,
 	}
 
@@ -757,7 +757,7 @@ func TestLookup_DomainOnlyQuery(t *testing.T) {
 
 	queryJSON, _ := json.Marshal(query)
 	question := &lookup.LookupQuestion{
-		Service: SLAPService,
+		Service: Service,
 		Query:   queryJSON,
 	}
 
@@ -823,7 +823,7 @@ func TestOutputAdmittedByTopic_DifferentServices(t *testing.T) {
 			}
 
 			payload := &engine.OutputAdmittedByTopic{
-				Topic:         SLAPTopic,
+				Topic:         Topic,
 				Outpoint:      outpoint,
 				LockingScript: scriptObj,
 			}
@@ -840,8 +840,8 @@ func TestOutputAdmittedByTopic_DifferentServices(t *testing.T) {
 }
 
 func TestSLAPLookupService_OutputNoLongerRetainedInHistory(t *testing.T) {
-	mockStorage := &MockSLAPStorageInterface{}
-	service := NewSLAPLookupService(mockStorage)
+	mockStorage := &MockStorage{}
+	service := NewLookupService(mockStorage)
 
 	// Create test outpoint
 	outpoint := &transaction.Outpoint{
@@ -858,8 +858,8 @@ func TestSLAPLookupService_OutputNoLongerRetainedInHistory(t *testing.T) {
 }
 
 func TestSLAPLookupService_OutputBlockHeightUpdated(t *testing.T) {
-	mockStorage := &MockSLAPStorageInterface{}
-	service := NewSLAPLookupService(mockStorage)
+	mockStorage := &MockStorage{}
+	service := NewLookupService(mockStorage)
 
 	// Create test transaction ID
 	txidBytes, err := hex.DecodeString("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")

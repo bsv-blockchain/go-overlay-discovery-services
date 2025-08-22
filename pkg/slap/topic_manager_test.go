@@ -12,19 +12,19 @@ import (
 
 // Test helper functions
 
-func createTestSLAPTopicManager() (*SLAPTopicManager, *MockSLAPStorageInterface) {
-	mockStorage := new(MockSLAPStorageInterface)
+func createTestSLAPTopicManager() (*TopicManager, *MockStorage) {
+	mockStorage := new(MockStorage)
 
-	topicManager := NewSLAPTopicManager(mockStorage, nil)
+	topicManager := NewTopicManager(mockStorage, nil)
 
 	return topicManager, mockStorage
 }
 
-func createTestSLAPTopicManagerWithLookupService() (*SLAPTopicManager, *MockSLAPStorageInterface, *SLAPLookupService) {
-	mockStorage := new(MockSLAPStorageInterface)
+func createTestSLAPTopicManagerWithLookupService() (*TopicManager, *MockStorage, *LookupService) {
+	mockStorage := new(MockStorage)
 
-	lookupService := NewSLAPLookupService(mockStorage)
-	topicManager := NewSLAPTopicManager(mockStorage, lookupService)
+	lookupService := NewLookupService(mockStorage)
+	topicManager := NewTopicManager(mockStorage, lookupService)
 
 	return topicManager, mockStorage, lookupService
 }
@@ -51,12 +51,12 @@ func createMockServiceHandler(called *bool, shouldError bool) ServiceMessageHand
 	}
 }
 
-// Test NewSLAPTopicManager
+// Test NewTopicManager
 
 func TestNewSLAPTopicManager(t *testing.T) {
-	mockStorage := new(MockSLAPStorageInterface)
+	mockStorage := new(MockStorage)
 
-	topicManager := NewSLAPTopicManager(mockStorage, nil)
+	topicManager := NewTopicManager(mockStorage, nil)
 
 	assert.NotNil(t, topicManager)
 	assert.Equal(t, mockStorage, topicManager.storage)
@@ -524,7 +524,7 @@ func TestGetTopicManagerMetaData(t *testing.T) {
 	metadata := topicManager.GetTopicManagerMetaData()
 
 	assert.Equal(t, "SLAP Topic Manager", metadata.Name)
-	assert.Equal(t, "Manages overlay network service subscriptions for SLAP protocol.", metadata.ShortDescription)
+	assert.Equal(t, "Manages overlay network service subscriptions for SLAP protocol.", metadata.Description)
 }
 
 func TestGetActiveServiceCount(t *testing.T) {

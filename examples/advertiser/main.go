@@ -8,35 +8,10 @@ import (
 
 	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/advertiser"
 	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
-	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/utils"
+	oa "github.com/bsv-blockchain/go-overlay-services/pkg/core/advertiser"
+	"github.com/bsv-blockchain/go-sdk/overlay"
+	"github.com/bsv-blockchain/go-sdk/script"
 )
-
-// MockPushDropDecoder is a mock implementation for demonstration purposes
-type MockPushDropDecoder struct{}
-
-func (m *MockPushDropDecoder) Decode(lockingScript string) (*types.PushDropResult, error) {
-	// This is a mock implementation - in a real scenario, this would
-	// decode actual PushDrop locking scripts
-	return &types.PushDropResult{
-		Fields: [][]byte{
-			[]byte("SHIP"),
-			[]byte{0xab, 0xcd, 0xef, 0x01, 0x23, 0x45, 0x67, 0x89},
-			[]byte("example.com"),
-			[]byte("payments"),
-		},
-	}, nil
-}
-
-// MockUtils is a mock implementation for demonstration purposes
-type MockUtils struct{}
-
-func (m *MockUtils) ToUTF8(data []byte) string {
-	return string(data)
-}
-
-func (m *MockUtils) ToHex(data []byte) string {
-	return utils.BytesToHex(data)
-}
 
 func main() {
 	fmt.Println("BSV Overlay Discovery Services - WalletAdvertiser Example")
@@ -74,10 +49,8 @@ func main() {
 
 	// Set up mock dependencies (in a real scenario, these would be actual implementations)
 	fmt.Println("\n2. Setting up dependencies...")
-	mockDecoder := &MockPushDropDecoder{}
-	mockUtils := &MockUtils{}
-	advertiser.SetPushDropDecoder(mockDecoder)
-	advertiser.SetUtils(mockUtils)
+	advertiser.SetSkipStorageValidation(true) // Skip storage validation for example
+	advertiser.SetTestMode(true)              // Enable test mode for example
 	fmt.Println("✓ Dependencies configured")
 
 	// Initialize the advertiser
@@ -90,13 +63,13 @@ func main() {
 
 	// Create some example advertisements
 	fmt.Println("\n4. Creating advertisements...")
-	adsData := []types.AdvertisementData{
+	adsData := []*oa.AdvertisementData{
 		{
-			Protocol:           types.ProtocolSHIP,
+			Protocol:           overlay.ProtocolSHIP,
 			TopicOrServiceName: "payments",
 		},
 		{
-			Protocol:           types.ProtocolSLAP,
+			Protocol:           overlay.ProtocolSLAP,
 			TopicOrServiceName: "identity_verification",
 		},
 	}
@@ -110,7 +83,8 @@ func main() {
 
 	// Parse an example advertisement
 	fmt.Println("\n5. Parsing an advertisement...")
-	outputScript := []byte{0x01, 0x02, 0x03, 0x04, 0x05} // Mock script
+	outputScriptBytes := []byte{0x01, 0x02, 0x03, 0x04, 0x05} // Mock script
+	outputScript := script.NewFromBytes(outputScriptBytes)
 	advertisement, err := advertiser.ParseAdvertisement(outputScript)
 	if err != nil {
 		fmt.Printf("Failed to parse advertisement: %v\n", err)
@@ -124,7 +98,7 @@ func main() {
 
 	// Find all advertisements for a protocol
 	fmt.Println("\n6. Finding advertisements...")
-	_, err = advertiser.FindAllAdvertisements("SHIP")
+	_, err = advertiser.FindAllAdvertisements(overlay.ProtocolSHIP)
 	if err != nil {
 		fmt.Printf("⚠ FindAllAdvertisements failed (expected): %v\n", err)
 		fmt.Println("   This is expected as storage integration is not yet implemented")

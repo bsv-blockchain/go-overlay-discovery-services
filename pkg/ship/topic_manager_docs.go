@@ -8,8 +8,8 @@ package ship
 // for creating valid SHIP tokens.
 const TopicManagerDocumentation = `# SHIP Topic Manager
 
-**Protocol Name**:  SHIP (Service Host Interconnect Protocol)  
-**Manager Name**: ` + "`SHIPTopicManager`" + `  
+**Protocol Name**:  SHIP (Service Host Interconnect Protocol)
+**Manager Name**: ` + "`SHIPTopicManager`" + `
 
 ---
 
@@ -42,12 +42,12 @@ This allows other nodes to discover hosts by querying the lookup service for val
       - Pass the BRC-87 checks
    5. ` + "`signature`" + ` — A valid signature (in DER) proving that ` + "`identityKey`" + ` is authorizing this output, in conjunction with the PushDrop locking key.
 
-2. **Signature Verification**:  
+2. **Signature Verification**:
    - The signature in the last field must be valid for the data in the first 4 fields.
-   - It must match the identity key, which in turn must match the locking public key used in the output script.  
+   - It must match the identity key, which in turn must match the locking public key used in the output script.
    - See the code in ` + "`isTokenSignatureCorrectlyLinked`" + ` for the implementation details.
 
-3. **Advertised URI**:  
+3. **Advertised URI**:
    - Must align with what is contemplated in BRC-101, which enforces certain URI formats (e.g., ` + "`https://`" + `, ` + "`wss://`" + `, or custom prefixed ` + "`https+bsvauth...`" + ` URIs).
    - No ` + "`localhost`" + ` or invalid URIs allowed.
 

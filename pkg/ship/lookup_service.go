@@ -1,5 +1,4 @@
 // Package ship implements the SHIP (Service Host Interconnect Protocol) lookup service functionality.
-// This package provides Go equivalents for the TypeScript SHIPLookupService class, implementing
 // the BSV overlay LookupService interface.
 package ship
 
@@ -21,46 +20,28 @@ import (
 
 // Constants for SHIP service configuration
 const (
-	// SHIPTopic is the topic manager topic for SHIP advertisements
-	SHIPTopic = "tm_ship"
-	// SHIPService is the lookup service identifier for SHIP
-	SHIPService = "ls_ship"
-	// SHIPIdentifier is the protocol identifier expected in PushDrop fields
-	SHIPIdentifier = "SHIP"
+	// Topic is the topic manager topic for SHIP advertisements
+	Topic = "tm_ship"
+	// Service is the lookup service identifier for SHIP
+	Service = "ls_ship"
+	// Identifier is the protocol identifier expected in PushDrop fields
+	Identifier = "SHIP"
 )
 
-// SHIPStorageInterface defines the interface for SHIP storage operations
-type SHIPStorageInterface interface {
-	StoreSHIPRecord(ctx context.Context, txid string, outputIndex int, identityKey, domain, topic string) error
-	DeleteSHIPRecord(ctx context.Context, txid string, outputIndex int) error
-	FindRecord(ctx context.Context, query types.SHIPQuery) ([]types.UTXOReference, error)
-	FindAll(ctx context.Context, limit, skip *int, sortOrder *types.SortOrder) ([]types.UTXOReference, error)
-	EnsureIndexes(ctx context.Context) error
-}
-
-// SHIPLookupService implements the BSV overlay LookupService interface for SHIP protocol.
+// LookupService implements the BSV overlay LookupService interface for SHIP protocol.
 // It provides lookup capabilities for SHIP tokens within the overlay network,
 // allowing discovery of nodes that host specific topics.
-type SHIPLookupService struct {
+type LookupService struct {
 	// storage is the SHIP storage implementation
-	storage SHIPStorageInterface
+	storage StorageInterface
 }
 
-// Compile-time verification that SHIPLookupService implements engine.LookupService
-var _ engine.LookupService = (*SHIPLookupService)(nil)
+// Compile-time verification that LookupService implements engine.LookupService
+var _ engine.LookupService = (*LookupService)(nil)
 
-// Compile-time verification that SHIPStorage implements SHIPStorageInterface
-var _ SHIPStorageInterface = (*SHIPStorage)(nil)
-
-// NewSHIPLookupService creates a new SHIP lookup service instance.
-//
-// Parameters:
-//   - storage: The SHIP storage implementation for data persistence
-//
-// Returns:
-//   - *SHIPLookupService: A new SHIP lookup service instance
-func NewSHIPLookupService(storage SHIPStorageInterface) *SHIPLookupService {
-	return &SHIPLookupService{
+// NewLookupService creates a new SHIP lookup service instance.
+func NewLookupService(storage StorageInterface) *LookupService {
+	return &LookupService{
 		storage: storage,
 	}
 }
@@ -74,15 +55,9 @@ func NewSHIPLookupService(storage SHIPStorageInterface) *SHIPLookupService {
 //   - fields[1]: Identity key in hex format
 //   - fields[2]: Domain string
 //   - fields[3]: Topic/service supported
-//
-// Parameters:
-//   - payload: The output admission payload containing topic, locking script, and UTXO reference
-//
-// Returns:
-//   - error: An error if processing fails, nil otherwise
-func (s *SHIPLookupService) OutputAdmittedByTopic(ctx context.Context, payload *engine.OutputAdmittedByTopic) error {
+func (s *LookupService) OutputAdmittedByTopic(ctx context.Context, payload *engine.OutputAdmittedByTopic) error {
 	// Only process SHIP topic
-	if payload.Topic != SHIPTopic {
+	if payload.Topic != Topic {
 		return nil // Silently ignore non-SHIP topics
 	}
 
@@ -102,7 +77,7 @@ func (s *SHIPLookupService) OutputAdmittedByTopic(ctx context.Context, payload *
 
 	// Extract and validate fields
 	shipIdentifier := string(result.Fields[0])
-	if shipIdentifier != SHIPIdentifier {
+	if shipIdentifier != Identifier {
 		return nil // Silently ignore non-SHIP protocols
 	}
 
@@ -117,15 +92,9 @@ func (s *SHIPLookupService) OutputAdmittedByTopic(ctx context.Context, payload *
 
 // OutputSpent handles an output being spent.
 // This method removes the corresponding SHIP record when the UTXO is spent.
-//
-// Parameters:
-//   - payload: The spent output payload containing topic and UTXO reference
-//
-// Returns:
-//   - error: An error if processing fails, nil otherwise
-func (s *SHIPLookupService) OutputSpent(ctx context.Context, payload *engine.OutputSpent) error {
+func (s *LookupService) OutputSpent(ctx context.Context, payload *engine.OutputSpent) error {
 	// Only process SHIP topic
-	if payload.Topic != SHIPTopic {
+	if payload.Topic != Topic {
 		return nil // Silently ignore non-SHIP topics
 	}
 
@@ -136,13 +105,7 @@ func (s *SHIPLookupService) OutputSpent(ctx context.Context, payload *engine.Out
 
 // OutputEvicted handles an output being evicted.
 // This method removes the corresponding SHIP record when the UTXO is evicted from the mempool.
-//
-// Parameters:
-//   - outpoint: The outpoint of the evicted output
-//
-// Returns:
-//   - error: An error if processing fails, nil otherwise
-func (s *SHIPLookupService) OutputEvicted(ctx context.Context, outpoint *transaction.Outpoint) error {
+func (s *LookupService) OutputEvicted(ctx context.Context, outpoint *transaction.Outpoint) error {
 	// Delete the SHIP record
 	txid := hex.EncodeToString(outpoint.Txid[:])
 	return s.storage.DeleteSHIPRecord(ctx, txid, int(outpoint.Index))
@@ -151,7 +114,7 @@ func (s *SHIPLookupService) OutputEvicted(ctx context.Context, outpoint *transac
 // OutputNoLongerRetainedInHistory handles outputs no longer retained in history.
 // Called when a Topic Manager decides that historical retention of the specified UTXO is no longer required.
 // For SHIP discovery services, this is typically a no-op as they don't maintain historical retention.
-func (s *SHIPLookupService) OutputNoLongerRetainedInHistory(ctx context.Context, outpoint *transaction.Outpoint, topic string) error {
+func (s *LookupService) OutputNoLongerRetainedInHistory(ctx context.Context, outpoint *transaction.Outpoint, topic string) error {
 	// Discovery services don't have the concept of historical retention, so we ignore it
 	return nil
 }
@@ -159,7 +122,7 @@ func (s *SHIPLookupService) OutputNoLongerRetainedInHistory(ctx context.Context,
 // OutputBlockHeightUpdated handles block height updates for transactions.
 // Called when the block height of a transaction is updated (e.g., when a transaction is included in a block).
 // For SHIP discovery services, this is typically a no-op as they don't track block heights.
-func (s *SHIPLookupService) OutputBlockHeightUpdated(ctx context.Context, txid *chainhash.Hash, blockHeight uint32, blockIndex uint64) error {
+func (s *LookupService) OutputBlockHeightUpdated(ctx context.Context, txid *chainhash.Hash, blockHeight uint32, blockIndex uint64) error {
 	// Discovery services don't handle block height updates, so we ignore it
 	return nil
 }
@@ -171,21 +134,14 @@ func (s *SHIPLookupService) OutputBlockHeightUpdated(ctx context.Context, txid *
 // Supported query formats:
 //   - String "findAll": Returns all SHIP records
 //   - Object with SHIPQuery fields: Filters by domain, topics, identityKey with pagination
-//
-// Parameters:
-//   - question: The lookup question containing service identifier and query parameters
-//
-// Returns:
-//   - *lookup.LookupAnswer: Matching UTXO references
-//   - error: An error if the query fails or is invalid, nil otherwise
-func (s *SHIPLookupService) Lookup(ctx context.Context, question *lookup.LookupQuestion) (*lookup.LookupAnswer, error) {
+func (s *LookupService) Lookup(ctx context.Context, question *lookup.LookupQuestion) (*lookup.LookupAnswer, error) {
 	// Validate required fields
 	if len(question.Query) == 0 {
 		return nil, fmt.Errorf("a valid query must be provided")
 	}
 
-	if question.Service != SHIPService {
-		return nil, fmt.Errorf("lookup service not supported: expected '%s', got '%s'", SHIPService, question.Service)
+	if question.Service != Service {
+		return nil, fmt.Errorf("lookup service not supported: expected '%s', got '%s'", Service, question.Service)
 	}
 
 	// Parse the query from JSON
@@ -229,7 +185,7 @@ func (s *SHIPLookupService) Lookup(ctx context.Context, question *lookup.LookupQ
 }
 
 // parseQueryObject parses and validates a query object
-func (s *SHIPLookupService) parseQueryObject(query interface{}) (*types.SHIPQuery, error) {
+func (s *LookupService) parseQueryObject(query interface{}) (*types.SHIPQuery, error) {
 	// Convert to JSON and back to ensure proper type mapping
 	jsonBytes, err := json.Marshal(query)
 	if err != nil {
@@ -250,7 +206,7 @@ func (s *SHIPLookupService) parseQueryObject(query interface{}) (*types.SHIPQuer
 }
 
 // validateQuery validates the query parameters
-func (s *SHIPLookupService) validateQuery(query *types.SHIPQuery) error {
+func (s *LookupService) validateQuery(query *types.SHIPQuery) error {
 	// Validate domain parameter
 	if query.Domain != nil {
 		if reflect.TypeOf(query.Domain).Kind() != reflect.Ptr ||
@@ -305,15 +261,12 @@ func (s *SHIPLookupService) validateQuery(query *types.SHIPQuery) error {
 // GetDocumentation returns the service documentation.
 // This method provides comprehensive documentation about the SHIP lookup service,
 // including usage examples and best practices.
-//
-// Returns:
-//   - string: The service documentation in markdown format
-func (s *SHIPLookupService) GetDocumentation() string {
+func (s *LookupService) GetDocumentation() string {
 	return LookupDocumentation
 }
 
 // convertUTXOsToLookupAnswer converts a slice of UTXO references to a LookupAnswer
-func (s *SHIPLookupService) convertUTXOsToLookupAnswer(utxos []types.UTXOReference) *lookup.LookupAnswer {
+func (s *LookupService) convertUTXOsToLookupAnswer(utxos []types.UTXOReference) *lookup.LookupAnswer {
 	// For discovery services, we return the UTXOs as freeform result
 	return &lookup.LookupAnswer{
 		Type:   lookup.AnswerTypeFreeform,
@@ -324,10 +277,7 @@ func (s *SHIPLookupService) convertUTXOsToLookupAnswer(utxos []types.UTXOReferen
 // GetMetaData returns the service metadata.
 // This method provides basic information about the SHIP lookup service
 // including name and description.
-//
-// Returns:
-//   - *overlay.MetaData: The service metadata
-func (s *SHIPLookupService) GetMetaData() *overlay.MetaData {
+func (s *LookupService) GetMetaData() *overlay.MetaData {
 	return &overlay.MetaData{
 		Name:        "SHIP Lookup Service",
 		Description: "Provides lookup capabilities for SHIP tokens.",

@@ -1,6 +1,5 @@
 // Package slap implements the SLAP (Service Lookup Availability Protocol) topic manager functionality.
-// This package provides Go equivalents for the TypeScript SLAPTopicManager class, enabling
-// overlay network service subscription management and message routing for SLAP protocol.
+// Overlay network service subscription management and message routing for SLAP protocol.
 package slap
 
 import (
@@ -9,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
 	"github.com/bsv-blockchain/go-sdk/overlay"
 	"github.com/bsv-blockchain/go-sdk/transaction"
 )
@@ -47,30 +45,10 @@ type ServiceMessage struct {
 // ServiceMessageHandler is a function type for handling service messages
 type ServiceMessageHandler func(ctx context.Context, message ServiceMessage) error
 
-// SLAPTopicManagerInterface defines the interface for SLAP topic management operations
-type SLAPTopicManagerInterface interface {
-	// SubscribeToService subscribes to a specific service with a message handler
-	SubscribeToService(ctx context.Context, service, domain string, handler ServiceMessageHandler) error
-	// UnsubscribeFromService unsubscribes from a specific service
-	UnsubscribeFromService(ctx context.Context, service, domain string) error
-	// HandleServiceMessage processes an incoming service message
-	HandleServiceMessage(ctx context.Context, message ServiceMessage) error
-	// GetSubscribedServices returns all current service subscriptions
-	GetSubscribedServices() []ServiceSubscription
-	// CreateServiceSubscription creates a new service subscription
-	CreateServiceSubscription(ctx context.Context, service, domain string) (*ServiceSubscription, error)
-	// IsSubscribedToService checks if currently subscribed to a service
-	IsSubscribedToService(service, domain string) bool
-	// GetServiceMessageCount returns the message count for a specific service
-	GetServiceMessageCount(service, domain string) int64
-	// Close cleanly shuts down the topic manager
-	Close(ctx context.Context) error
-}
-
-// SLAPTopicManager implements topic management functionality for SLAP protocol.
+// TopicManager implements topic management functionality for SLAP protocol.
 // It provides capabilities for subscribing to overlay network services, handling messages,
 // and managing service lifecycle within the SLAP ecosystem.
-type SLAPTopicManager struct {
+type TopicManager struct {
 	// subscriptions holds all active service subscriptions keyed by service+domain
 	subscriptions map[string]*ServiceSubscription
 	// handlers holds message handlers for each subscribed service
@@ -78,26 +56,16 @@ type SLAPTopicManager struct {
 	// mutex protects concurrent access to subscriptions and handlers
 	mutex sync.RWMutex
 	// storage provides access to SLAP storage operations
-	storage SLAPStorageInterface
+	storage StorageInterface
 	// lookupService provides access to SLAP lookup operations (optional integration)
-	lookupService *SLAPLookupService
+	lookupService *LookupService
 }
 
-// Compile-time verification that SLAPTopicManager implements SLAPTopicManagerInterface
-var _ SLAPTopicManagerInterface = (*SLAPTopicManager)(nil)
-
-// NewSLAPTopicManager creates a new SLAP topic manager instance.
+// NewTopicManager creates a new SLAP topic manager instance.
 // This constructor initializes the topic manager with the required dependencies
 // for managing overlay network service subscriptions and message routing.
-//
-// Parameters:
-//   - storage: The SLAP storage implementation for data persistence
-//   - lookupService: Optional SLAP lookup service for integration (can be nil)
-//
-// Returns:
-//   - *SLAPTopicManager: A new SLAP topic manager instance
-func NewSLAPTopicManager(storage SLAPStorageInterface, lookupService *SLAPLookupService) *SLAPTopicManager {
-	return &SLAPTopicManager{
+func NewTopicManager(storage StorageInterface, lookupService *LookupService) *TopicManager {
+	return &TopicManager{
 		subscriptions: make(map[string]*ServiceSubscription),
 		handlers:      make(map[string]ServiceMessageHandler),
 		storage:       storage,
@@ -106,23 +74,14 @@ func NewSLAPTopicManager(storage SLAPStorageInterface, lookupService *SLAPLookup
 }
 
 // getSubscriptionKey creates a unique key for service+domain combination
-func (tm *SLAPTopicManager) getSubscriptionKey(service, domain string) string {
+func (tm *TopicManager) getSubscriptionKey(service, domain string) string {
 	return fmt.Sprintf("%s@%s", service, domain)
 }
 
 // SubscribeToService subscribes to a specific service with a message handler.
 // Creates a new subscription if one doesn't exist, or updates an existing one.
 // The provided handler will be called for all messages received for this service.
-//
-// Parameters:
-//   - ctx: Context for the operation
-//   - service: The service name to subscribe to
-//   - domain: The domain associated with the service
-//   - handler: The message handler function to call for messages on this service
-//
-// Returns:
-//   - error: An error if the subscription fails, nil otherwise
-func (tm *SLAPTopicManager) SubscribeToService(ctx context.Context, service, domain string, handler ServiceMessageHandler) error {
+func (tm *TopicManager) SubscribeToService(ctx context.Context, service, domain string, handler ServiceMessageHandler) error {
 	if service == "" {
 		return fmt.Errorf("service name cannot be empty")
 	}
@@ -165,15 +124,7 @@ func (tm *SLAPTopicManager) SubscribeToService(ctx context.Context, service, dom
 // UnsubscribeFromService unsubscribes from a specific service.
 // Marks the subscription as inactive and removes the message handler.
 // The subscription record is kept for historical purposes.
-//
-// Parameters:
-//   - ctx: Context for the operation
-//   - service: The service name to unsubscribe from
-//   - domain: The domain associated with the service
-//
-// Returns:
-//   - error: An error if the unsubscription fails, nil otherwise
-func (tm *SLAPTopicManager) UnsubscribeFromService(ctx context.Context, service, domain string) error {
+func (tm *TopicManager) UnsubscribeFromService(ctx context.Context, service, domain string) error {
 	if service == "" {
 		return fmt.Errorf("service name cannot be empty")
 	}
@@ -204,14 +155,7 @@ func (tm *SLAPTopicManager) UnsubscribeFromService(ctx context.Context, service,
 // HandleServiceMessage processes an incoming service message.
 // Routes the message to the appropriate handler if one exists for the service.
 // Updates message statistics for the service.
-//
-// Parameters:
-//   - ctx: Context for the operation
-//   - message: The service message to process
-//
-// Returns:
-//   - error: An error if message handling fails, nil otherwise
-func (tm *SLAPTopicManager) HandleServiceMessage(ctx context.Context, message ServiceMessage) error {
+func (tm *TopicManager) HandleServiceMessage(ctx context.Context, message ServiceMessage) error {
 	if message.Service == "" {
 		return fmt.Errorf("message service cannot be empty")
 	}
@@ -252,10 +196,7 @@ func (tm *SLAPTopicManager) HandleServiceMessage(ctx context.Context, message Se
 
 // GetSubscribedServices returns all current service subscriptions.
 // Returns a copy of subscription data to prevent external modification.
-//
-// Returns:
-//   - []ServiceSubscription: A slice of all service subscriptions
-func (tm *SLAPTopicManager) GetSubscribedServices() []ServiceSubscription {
+func (tm *TopicManager) GetSubscribedServices() []ServiceSubscription {
 	tm.mutex.RLock()
 	defer tm.mutex.RUnlock()
 
@@ -270,16 +211,7 @@ func (tm *SLAPTopicManager) GetSubscribedServices() []ServiceSubscription {
 
 // CreateServiceSubscription creates a new service subscription without a handler.
 // This method is useful for creating subscription records before setting up handlers.
-//
-// Parameters:
-//   - ctx: Context for the operation
-//   - service: The service name to create a subscription for
-//   - domain: The domain associated with the service
-//
-// Returns:
-//   - *ServiceSubscription: The created subscription
-//   - error: An error if creation fails, nil otherwise
-func (tm *SLAPTopicManager) CreateServiceSubscription(ctx context.Context, service, domain string) (*ServiceSubscription, error) {
+func (tm *TopicManager) CreateServiceSubscription(ctx context.Context, service, domain string) (*ServiceSubscription, error) {
 	if service == "" {
 		return nil, fmt.Errorf("service name cannot be empty")
 	}
@@ -314,14 +246,7 @@ func (tm *SLAPTopicManager) CreateServiceSubscription(ctx context.Context, servi
 
 // IsSubscribedToService checks if currently subscribed to a service.
 // Only returns true for active subscriptions.
-//
-// Parameters:
-//   - service: The service name to check
-//   - domain: The domain associated with the service
-//
-// Returns:
-//   - bool: True if actively subscribed to the service, false otherwise
-func (tm *SLAPTopicManager) IsSubscribedToService(service, domain string) bool {
+func (tm *TopicManager) IsSubscribedToService(service, domain string) bool {
 	tm.mutex.RLock()
 	defer tm.mutex.RUnlock()
 
@@ -332,14 +257,7 @@ func (tm *SLAPTopicManager) IsSubscribedToService(service, domain string) bool {
 
 // GetServiceMessageCount returns the message count for a specific service.
 // Returns 0 if the service is not subscribed to.
-//
-// Parameters:
-//   - service: The service name to get the message count for
-//   - domain: The domain associated with the service
-//
-// Returns:
-//   - int64: The number of messages received for this service
-func (tm *SLAPTopicManager) GetServiceMessageCount(service, domain string) int64 {
+func (tm *TopicManager) GetServiceMessageCount(service, domain string) int64 {
 	tm.mutex.RLock()
 	defer tm.mutex.RUnlock()
 
@@ -352,13 +270,7 @@ func (tm *SLAPTopicManager) GetServiceMessageCount(service, domain string) int64
 
 // Close cleanly shuts down the topic manager.
 // Unsubscribes from all services and cleans up resources.
-//
-// Parameters:
-//   - ctx: Context for the shutdown operation
-//
-// Returns:
-//   - error: An error if shutdown fails, nil otherwise
-func (tm *SLAPTopicManager) Close(ctx context.Context) error {
+func (tm *TopicManager) Close(ctx context.Context) error {
 	tm.mutex.Lock()
 	defer tm.mutex.Unlock()
 
@@ -375,21 +287,15 @@ func (tm *SLAPTopicManager) Close(ctx context.Context) error {
 
 // GetTopicManagerMetaData returns metadata information for the SLAP topic manager.
 // This provides basic information about the topic manager service.
-//
-// Returns:
-//   - types.MetaData: The topic manager metadata
-func (tm *SLAPTopicManager) GetTopicManagerMetaData() types.MetaData {
-	return types.MetaData{
-		Name:             "SLAP Topic Manager",
-		ShortDescription: "Manages overlay network service subscriptions for SLAP protocol.",
+func (tm *TopicManager) GetTopicManagerMetaData() overlay.MetaData {
+	return overlay.MetaData{
+		Name:        "SLAP Topic Manager",
+		Description: "Manages overlay network service subscriptions for SLAP protocol.",
 	}
 }
 
 // GetActiveServiceCount returns the number of currently active service subscriptions.
-//
-// Returns:
-//   - int: The number of active subscriptions
-func (tm *SLAPTopicManager) GetActiveServiceCount() int {
+func (tm *TopicManager) GetActiveServiceCount() int {
 	tm.mutex.RLock()
 	defer tm.mutex.RUnlock()
 
@@ -403,10 +309,7 @@ func (tm *SLAPTopicManager) GetActiveServiceCount() int {
 }
 
 // GetTotalMessageCount returns the total number of messages processed across all services.
-//
-// Returns:
-//   - int64: The total message count
-func (tm *SLAPTopicManager) GetTotalMessageCount() int64 {
+func (tm *TopicManager) GetTotalMessageCount() int64 {
 	tm.mutex.RLock()
 	defer tm.mutex.RUnlock()
 
@@ -418,13 +321,7 @@ func (tm *SLAPTopicManager) GetTotalMessageCount() int64 {
 }
 
 // GetServicesByDomain returns all active service subscriptions for a specific domain.
-//
-// Parameters:
-//   - domain: The domain to filter by
-//
-// Returns:
-//   - []ServiceSubscription: Service subscriptions for the specified domain
-func (tm *SLAPTopicManager) GetServicesByDomain(domain string) []ServiceSubscription {
+func (tm *TopicManager) GetServicesByDomain(domain string) []ServiceSubscription {
 	tm.mutex.RLock()
 	defer tm.mutex.RUnlock()
 
@@ -439,10 +336,7 @@ func (tm *SLAPTopicManager) GetServicesByDomain(domain string) []ServiceSubscrip
 }
 
 // GetAvailableServices returns a list of unique service names that are currently subscribed to.
-//
-// Returns:
-//   - []string: List of unique service names
-func (tm *SLAPTopicManager) GetAvailableServices() []string {
+func (tm *TopicManager) GetAvailableServices() []string {
 	tm.mutex.RLock()
 	defer tm.mutex.RUnlock()
 
@@ -463,7 +357,7 @@ func (tm *SLAPTopicManager) GetAvailableServices() []string {
 
 // IdentifyAdmissibleOutputs implements the engine.TopicManager interface
 // For SLAP, this identifies outputs that should be admitted to the overlay
-func (tm *SLAPTopicManager) IdentifyAdmissibleOutputs(ctx context.Context, beef []byte, previousCoins map[uint32]*transaction.TransactionOutput) (overlay.AdmittanceInstructions, error) {
+func (tm *TopicManager) IdentifyAdmissibleOutputs(ctx context.Context, beef []byte, previousCoins map[uint32]*transaction.TransactionOutput) (overlay.AdmittanceInstructions, error) {
 	// SLAP topic manager doesn't admit outputs directly - it manages service lookup
 	// Return empty admissible list
 	return overlay.AdmittanceInstructions{
@@ -473,20 +367,20 @@ func (tm *SLAPTopicManager) IdentifyAdmissibleOutputs(ctx context.Context, beef 
 
 // IdentifyNeededInputs implements the engine.TopicManager interface
 // For SLAP, this identifies inputs needed for validation
-func (tm *SLAPTopicManager) IdentifyNeededInputs(ctx context.Context, beef []byte) ([]*transaction.Outpoint, error) {
+func (tm *TopicManager) IdentifyNeededInputs(ctx context.Context, beef []byte) ([]*transaction.Outpoint, error) {
 	// SLAP doesn't require specific inputs for validation
 	return []*transaction.Outpoint{}, nil
 }
 
 // GetDocumentation implements the engine.TopicManager interface
 // Returns documentation for the SLAP topic manager
-func (tm *SLAPTopicManager) GetDocumentation() string {
+func (tm *TopicManager) GetDocumentation() string {
 	return TopicManagerDocumentation
 }
 
 // GetMetaData implements the engine.TopicManager interface
 // Returns metadata about the SLAP topic manager
-func (tm *SLAPTopicManager) GetMetaData() *overlay.MetaData {
+func (tm *TopicManager) GetMetaData() *overlay.MetaData {
 	return &overlay.MetaData{
 		Name:        "SLAP Topic Manager",
 		Description: "Manages SLAP protocol topics for service lookup and availability tracking",

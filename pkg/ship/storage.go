@@ -1,5 +1,4 @@
 // Package ship implements the SHIP (Service Host Interconnect Protocol) storage functionality.
-// This package provides Go equivalents for the TypeScript SHIPStorage class, enabling
 // MongoDB-based storage and retrieval of SHIP records.
 package ship
 
@@ -15,28 +14,29 @@ import (
 	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
 )
 
-// SHIPStorage implements a storage engine for SHIP protocol records.
+type StorageInterface interface {
+	StoreSHIPRecord(ctx context.Context, txid string, outputIndex int, identityKey, domain, topic string) error
+	DeleteSHIPRecord(ctx context.Context, txid string, outputIndex int) error
+	FindRecord(ctx context.Context, query types.SHIPQuery) ([]types.UTXOReference, error)
+	FindAll(ctx context.Context, limit, skip *int, sortOrder *types.SortOrder) ([]types.UTXOReference, error)
+	EnsureIndexes(ctx context.Context) error
+}
+
+// Storage implements a storage engine for SHIP protocol records.
 // It provides MongoDB-based storage with methods for storing, deleting,
 // and querying SHIP records with support for pagination and filtering.
-// SHIPStorage implements the SHIPStorageInterface interface.
-type SHIPStorage struct {
+type Storage struct {
 	db          *mongo.Database
 	shipRecords *mongo.Collection
 }
 
-// Note: Compile-time verification that SHIPStorage implements SHIPStorageInterface
+// Note: Compile-time verification that Storage implements SHIPStorageInterface
 // is performed in lookup_service.go to avoid circular dependencies
 
-// NewSHIPStorage constructs a new SHIPStorage instance with the provided MongoDB database.
+// NewStorage constructs a new Storage instance with the provided MongoDB database.
 // The storage uses a collection named "shipRecords" to store SHIP protocol records.
-//
-// Parameters:
-//   - db: A connected MongoDB database instance
-//
-// Returns:
-//   - *SHIPStorage: A new SHIPStorage instance
-func NewSHIPStorage(db *mongo.Database) *SHIPStorage {
-	return &SHIPStorage{
+func NewStorage(db *mongo.Database) *Storage {
+	return &Storage{
 		db:          db,
 		shipRecords: db.Collection("shipRecords"),
 	}
@@ -45,10 +45,7 @@ func NewSHIPStorage(db *mongo.Database) *SHIPStorage {
 // EnsureIndexes creates the necessary indexes for the SHIP records collection.
 // This method should be called once during application initialization to optimize
 // query performance. It creates a compound index on domain and topic fields.
-//
-// Returns:
-//   - error: An error if index creation fails, nil otherwise
-func (s *SHIPStorage) EnsureIndexes(ctx context.Context) error {
+func (s *Storage) EnsureIndexes(ctx context.Context) error {
 	indexModel := mongo.IndexModel{
 		Keys: bson.D{
 			{Key: "domain", Value: 1},
@@ -67,18 +64,7 @@ func (s *SHIPStorage) EnsureIndexes(ctx context.Context) error {
 // StoreSHIPRecord stores a new SHIP record in the database.
 // The record includes transaction information, identity key, domain, topic,
 // and an automatically generated creation timestamp.
-//
-// Parameters:
-//   - ctx: Context for the database operation
-//   - txid: The transaction ID where this record is stored
-//   - outputIndex: The index of the output within the transaction
-//   - identityKey: The public key that identifies the service provider
-//   - domain: The domain where the service is hosted
-//   - topic: The specific topic or service type being advertised
-//
-// Returns:
-//   - error: An error if the storage operation fails, nil otherwise
-func (s *SHIPStorage) StoreSHIPRecord(ctx context.Context, txid string, outputIndex int, identityKey, domain, topic string) error {
+func (s *Storage) StoreSHIPRecord(ctx context.Context, txid string, outputIndex int, identityKey, domain, topic string) error {
 	record := types.SHIPRecord{
 		Txid:        txid,
 		OutputIndex: outputIndex,
@@ -98,15 +84,7 @@ func (s *SHIPStorage) StoreSHIPRecord(ctx context.Context, txid string, outputIn
 
 // DeleteSHIPRecord deletes a SHIP record from the database based on transaction ID and output index.
 // This method is typically used when a UTXO is spent and the associated SHIP record should be removed.
-//
-// Parameters:
-//   - ctx: Context for the database operation
-//   - txid: The transaction ID of the record to delete
-//   - outputIndex: The output index of the record to delete
-//
-// Returns:
-//   - error: An error if the deletion operation fails, nil otherwise
-func (s *SHIPStorage) DeleteSHIPRecord(ctx context.Context, txid string, outputIndex int) error {
+func (s *Storage) DeleteSHIPRecord(ctx context.Context, txid string, outputIndex int) error {
 	filter := bson.M{
 		"txid":        txid,
 		"outputIndex": outputIndex,
@@ -123,15 +101,7 @@ func (s *SHIPStorage) DeleteSHIPRecord(ctx context.Context, txid string, outputI
 // FindRecord finds SHIP records based on the provided query parameters.
 // It supports filtering by domain, topics, and identity key, with pagination and sorting options.
 // Returns only UTXO references (txid and outputIndex) as projection for efficient querying.
-//
-// Parameters:
-//   - ctx: Context for the database operation
-//   - query: SHIPQuery containing filter criteria and pagination options
-//
-// Returns:
-//   - []types.UTXOReference: Matching UTXO references
-//   - error: An error if the query operation fails, nil otherwise
-func (s *SHIPStorage) FindRecord(ctx context.Context, query types.SHIPQuery) ([]types.UTXOReference, error) {
+func (s *Storage) FindRecord(ctx context.Context, query types.SHIPQuery) ([]types.UTXOReference, error) {
 	mongoQuery := bson.M{}
 
 	// Add domain filter if provided
@@ -210,17 +180,7 @@ func (s *SHIPStorage) FindRecord(ctx context.Context, query types.SHIPQuery) ([]
 // FindAll returns all SHIP records in the database with optional pagination and sorting.
 // This method ignores all filtering criteria and returns all available records.
 // Returns only UTXO references (txid and outputIndex) as projection for efficient querying.
-//
-// Parameters:
-//   - ctx: Context for the database operation
-//   - limit: Optional limit for pagination (nil for no limit)
-//   - skip: Optional skip for pagination (nil for no skip)
-//   - sortOrder: Optional sort order (types.SortOrderAsc or types.SortOrderDesc, nil defaults to desc)
-//
-// Returns:
-//   - []types.UTXOReference: All matching UTXO references
-//   - error: An error if the query operation fails, nil otherwise
-func (s *SHIPStorage) FindAll(ctx context.Context, limit, skip *int, sortOrder *types.SortOrder) ([]types.UTXOReference, error) {
+func (s *Storage) FindAll(ctx context.Context, limit, skip *int, sortOrder *types.SortOrder) ([]types.UTXOReference, error) {
 	// Set up the find options
 	findOpts := options.Find()
 

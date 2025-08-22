@@ -43,7 +43,7 @@ func main() {
 // ExampleOutputAdmittedByTopic demonstrates how to call OutputAdmittedByTopic
 // with a properly constructed engine.OutputAdmittedByTopic payload.
 // This shows the expected API structure for SHIP advertisement processing.
-func ExampleOutputAdmittedByTopic(ctx context.Context, lookupService *ship.SHIPLookupService) error {
+func ExampleOutputAdmittedByTopic(ctx context.Context, lookupService *ship.LookupService) error {
 	fmt.Println("Demonstrating OutputAdmittedByTopic API usage:")
 
 	// Create a sample transaction ID (32 bytes)
@@ -72,7 +72,7 @@ func ExampleOutputAdmittedByTopic(ctx context.Context, lookupService *ship.SHIPL
 	// Construct the OutputAdmittedByTopic payload
 	// This structure would normally be created by the overlay engine
 	payload := &engine.OutputAdmittedByTopic{
-		Topic:         ship.SHIPTopic, // "tm_ship"
+		Topic:         ship.Topic, // "tm_ship"
 		Outpoint:      outpoint,
 		Satoshis:      1000, // Sample satoshi value
 		LockingScript: lockingScript,
@@ -164,7 +164,7 @@ func ExampleOutputAdmittedByTopicDemo() {
 
 	// Show the structure that would be passed to OutputAdmittedByTopic
 	payload := &engine.OutputAdmittedByTopic{
-		Topic:         ship.SHIPTopic, // "tm_ship"
+		Topic:         ship.Topic, // "tm_ship"
 		Outpoint:      outpoint,
 		Satoshis:      1000,
 		LockingScript: lockingScript,
@@ -195,7 +195,7 @@ func ExampleUsage() {
 
 	// 2. Create SHIP storage
 	db := client.Database("overlay_services")
-	storage := ship.NewSHIPStorage(db)
+	storage := ship.NewStorage(db)
 
 	// Ensure indexes are created
 	if err := storage.EnsureIndexes(ctx); err != nil {
@@ -203,7 +203,7 @@ func ExampleUsage() {
 	}
 
 	// 3. Create the SHIP lookup service
-	lookupService := ship.NewSHIPLookupService(storage)
+	lookupService := ship.NewLookupService(storage)
 
 	// 4. Example: Handle an output admitted by topic
 	// Note: This demonstrates the API structure. In production, the overlay engine
@@ -277,7 +277,7 @@ func ExampleUsage() {
 // ExampleOutputSpent demonstrates how to call OutputSpent
 // with a properly constructed engine.OutputSpent payload.
 // This shows the expected API structure for SHIP output spending.
-func ExampleOutputSpent(ctx context.Context, lookupService *ship.SHIPLookupService) error {
+func ExampleOutputSpent(ctx context.Context, lookupService *ship.LookupService) error {
 	fmt.Println("Demonstrating OutputSpent API usage:")
 
 	// Create a sample transaction ID (32 bytes) - same as the admitted output
@@ -319,7 +319,7 @@ func ExampleOutputSpent(ctx context.Context, lookupService *ship.SHIPLookupServi
 	// This structure would normally be created by the overlay engine
 	payload := &engine.OutputSpent{
 		Outpoint:        outpoint,
-		Topic:           ship.SHIPTopic, // "tm_ship"
+		Topic:           ship.Topic, // "tm_ship"
 		SpendingTxid:    spendingTxidHash,
 		InputIndex:      0,
 		UnlockingScript: unlockingScript,
@@ -344,15 +344,15 @@ func ExampleOutputSpent(ctx context.Context, lookupService *ship.SHIPLookupServi
 // ExampleSHIPStorageInterface demonstrates how SHIPStorage implements the interface
 func ExampleSHIPStorageInterface() {
 	// This example shows that SHIPStorage implements SHIPStorageInterface
-	var _ ship.SHIPStorageInterface = &ship.SHIPStorage{}
+	var _ ship.StorageInterface = &ship.Storage{}
 
 	fmt.Println("SHIPStorage successfully implements SHIPStorageInterface")
 }
 
 // ExampleLookupServiceInterface demonstrates how SHIPLookupService implements the BSV overlay interface
 func ExampleLookupServiceInterface() {
-	// This example shows that SHIPLookupService implements types.LookupService
-	var _ engine.LookupService = &ship.SHIPLookupService{}
+	// This example shows that LookupService implements types.LookupService
+	var _ engine.LookupService = &ship.LookupService{}
 
-	fmt.Println("SHIPLookupService successfully implements types.LookupService")
+	fmt.Println("LookupService successfully implements types.LookupService")
 }

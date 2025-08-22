@@ -1,6 +1,5 @@
 // Package advertiser implements the WalletAdvertiser functionality for creating and managing
 // SHIP (Service Host Interconnect Protocol) and SLAP (Service Lookup Availability Protocol) advertisements.
-// This package provides Go equivalents for the TypeScript WalletAdvertiser class.
 package advertiser
 
 import (
@@ -8,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/bsv-blockchain/go-sdk/transaction/template/pushdrop"
 	"io"
 	"net/http"
 	"net/url"
@@ -16,14 +16,9 @@ import (
 
 	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
 	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/utils"
-)
-
-// Constants for advertisement protocols
-const (
-	// SHIPProtocol is the protocol identifier for SHIP advertisements
-	SHIPProtocol = "SHIP"
-	// SLAPProtocol is the protocol identifier for SLAP advertisements
-	SLAPProtocol = "SLAP"
+	oa "github.com/bsv-blockchain/go-overlay-services/pkg/core/advertiser"
+	"github.com/bsv-blockchain/go-sdk/overlay"
+	"github.com/bsv-blockchain/go-sdk/script"
 )
 
 // WalletAdvertiser implements the Advertiser interface for creating and managing
@@ -40,10 +35,6 @@ type WalletAdvertiser struct {
 	advertisableURI string
 	// lookupResolverConfig contains configuration for lookup resolution
 	lookupResolverConfig *types.LookupResolverConfig
-	// pushDropDecoder handles PushDrop locking script decoding
-	pushDropDecoder types.PushDropDecoder
-	// utils provides utility functions for data conversion
-	utils types.Utils
 	// initialized tracks whether the advertiser has been initialized
 	initialized bool
 	// skipStorageValidation allows skipping storage connectivity validation (for testing)
@@ -52,21 +43,10 @@ type WalletAdvertiser struct {
 	testMode bool
 }
 
-// Compile-time verification that WalletAdvertiser implements types.Advertiser
-var _ types.Advertiser = (*WalletAdvertiser)(nil)
+// Compile-time verification that WalletAdvertiser implements oa.Advertiser
+var _ oa.Advertiser = (*WalletAdvertiser)(nil)
 
 // NewWalletAdvertiser creates a new WalletAdvertiser instance.
-//
-// Parameters:
-//   - chain: The blockchain network identifier (e.g., "main", "test")
-//   - privateKey: The private key in hex format for signing advertisements
-//   - storageURL: The URL for storing advertisement data
-//   - advertisableURI: The URI that will be advertised for service discovery
-//   - lookupResolverConfig: Configuration for lookup resolution (can be nil)
-//
-// Returns:
-//   - *WalletAdvertiser: A new WalletAdvertiser instance
-//   - error: An error if validation fails, nil otherwise
 func NewWalletAdvertiser(chain, privateKey, storageURL, advertisableURI string, lookupResolverConfig *types.LookupResolverConfig) (*WalletAdvertiser, error) {
 	// Validate required parameters
 	if strings.TrimSpace(chain) == "" {
@@ -107,58 +87,23 @@ func NewWalletAdvertiser(chain, privateKey, storageURL, advertisableURI string, 
 	}, nil
 }
 
-// SetPushDropDecoder sets the PushDrop decoder for this advertiser.
-// This method should be called before Init() to provide the necessary decoder functionality.
-//
-// Parameters:
-//   - decoder: The PushDrop decoder implementation
-func (w *WalletAdvertiser) SetPushDropDecoder(decoder types.PushDropDecoder) {
-	w.pushDropDecoder = decoder
-}
-
-// SetUtils sets the utility functions for this advertiser.
-// This method should be called before Init() to provide the necessary utility functionality.
-//
-// Parameters:
-//   - utils: The utility functions implementation
-func (w *WalletAdvertiser) SetUtils(utils types.Utils) {
-	w.utils = utils
-}
-
 // SetSkipStorageValidation allows skipping storage connectivity validation.
 // This is useful for testing environments where the storage service may not be available.
-//
-// Parameters:
-//   - skip: Whether to skip storage validation
 func (w *WalletAdvertiser) SetSkipStorageValidation(skip bool) {
 	w.skipStorageValidation = skip
 }
 
 // SetTestMode enables test mode with mock data instead of real HTTP requests.
 // This is useful for testing without requiring actual storage services.
-//
-// Parameters:
-//   - testMode: Whether to enable test mode
 func (w *WalletAdvertiser) SetTestMode(testMode bool) {
 	w.testMode = testMode
 }
 
 // Init initializes the advertiser service and sets up any required resources.
 // This method must be called before using any other advertiser functionality.
-//
-// Returns:
-//   - error: An error if initialization fails, nil otherwise
 func (w *WalletAdvertiser) Init() error {
 	if w.initialized {
 		return fmt.Errorf("WalletAdvertiser is already initialized")
-	}
-
-	// Validate that required dependencies are set
-	if w.pushDropDecoder == nil {
-		return fmt.Errorf("PushDropDecoder must be set before initialization")
-	}
-	if w.utils == nil {
-		return fmt.Errorf("Utils must be set before initialization")
 	}
 
 	// Initialize wallet connection and verify private key
@@ -184,33 +129,26 @@ func (w *WalletAdvertiser) Init() error {
 
 // CreateAdvertisements creates new advertisements and returns them as a tagged BEEF.
 // This method supports both SHIP and SLAP protocol advertisements.
-//
-// Parameters:
-//   - adsData: Array of advertisement data specifying the protocols and topics/services to advertise
-//
-// Returns:
-//   - types.TaggedBEEF: The created advertisements as a tagged BEEF structure
-//   - error: An error if creation fails, nil otherwise
-func (w *WalletAdvertiser) CreateAdvertisements(adsData []types.AdvertisementData) (types.TaggedBEEF, error) {
+func (w *WalletAdvertiser) CreateAdvertisements(adsData []*oa.AdvertisementData) (overlay.TaggedBEEF, error) {
 	if !w.initialized {
-		return types.TaggedBEEF{}, fmt.Errorf("WalletAdvertiser must be initialized before creating advertisements")
+		return overlay.TaggedBEEF{}, fmt.Errorf("WalletAdvertiser must be initialized before creating advertisements")
 	}
 
 	if len(adsData) == 0 {
-		return types.TaggedBEEF{}, fmt.Errorf("at least one advertisement data entry is required")
+		return overlay.TaggedBEEF{}, fmt.Errorf("at least one advertisement data entry is required")
 	}
 
 	// Validate all advertisement data entries
 	var topics []string
 	for i, adData := range adsData {
 		if err := w.validateAdvertisementData(adData); err != nil {
-			return types.TaggedBEEF{}, fmt.Errorf("invalid advertisement data at index %d: %w", i, err)
+			return overlay.TaggedBEEF{}, fmt.Errorf("invalid advertisement data at index %d: %w", i, err)
 		}
 
 		// Collect topics for the TaggedBEEF
-		if adData.Protocol == types.ProtocolSHIP {
+		if adData.Protocol == overlay.ProtocolSHIP {
 			topics = append(topics, "tm_"+adData.TopicOrServiceName)
-		} else if adData.Protocol == types.ProtocolSLAP {
+		} else if adData.Protocol == overlay.ProtocolSLAP {
 			topics = append(topics, "tm_"+adData.TopicOrServiceName)
 		}
 	}
@@ -218,42 +156,35 @@ func (w *WalletAdvertiser) CreateAdvertisements(adsData []types.AdvertisementDat
 	// Create BSV transactions with PushDrop outputs
 	transactions, err := w.createAdvertisementTransactions(adsData)
 	if err != nil {
-		return types.TaggedBEEF{}, fmt.Errorf("failed to create advertisement transactions: %w", err)
+		return overlay.TaggedBEEF{}, fmt.Errorf("failed to create advertisement transactions: %w", err)
 	}
 
 	// Encode the transactions as BEEF format
 	beefData, err := w.encodeTransactionsAsBEEF(transactions)
 	if err != nil {
-		return types.TaggedBEEF{}, fmt.Errorf("failed to encode transactions as BEEF: %w", err)
+		return overlay.TaggedBEEF{}, fmt.Errorf("failed to encode transactions as BEEF: %w", err)
 	}
 
-	return types.TaggedBEEF{
-		BEEF:   beefData,
+	return overlay.TaggedBEEF{
+		Beef:   beefData,
 		Topics: topics,
 	}, nil
 }
 
 // FindAllAdvertisements finds all advertisements for a given protocol.
 // This method queries the storage to retrieve existing advertisements.
-//
-// Parameters:
-//   - protocol: The protocol to search for ("SHIP" or "SLAP")
-//
-// Returns:
-//   - []types.Advertisement: Array of matching advertisements
-//   - error: An error if the search fails, nil otherwise
-func (w *WalletAdvertiser) FindAllAdvertisements(protocol string) ([]types.Advertisement, error) {
+func (w *WalletAdvertiser) FindAllAdvertisements(protocol overlay.Protocol) ([]*oa.Advertisement, error) {
 	if !w.initialized {
 		return nil, fmt.Errorf("WalletAdvertiser must be initialized before finding advertisements")
 	}
 
 	// Validate protocol
-	if protocol != string(types.ProtocolSHIP) && protocol != string(types.ProtocolSLAP) {
+	if protocol != overlay.ProtocolSHIP && protocol != overlay.ProtocolSLAP {
 		return nil, fmt.Errorf("unsupported protocol: %s (must be 'SHIP' or 'SLAP')", protocol)
 	}
 
 	// Query the storage for advertisements matching the protocol
-	advertisements, err := w.queryStorageForAdvertisements(protocol)
+	advertisements, err := w.queryStorageForNewAdvertisements(protocol)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query storage for %s advertisements: %w", protocol, err)
 	}
@@ -263,120 +194,108 @@ func (w *WalletAdvertiser) FindAllAdvertisements(protocol string) ([]types.Adver
 
 // RevokeAdvertisements revokes existing advertisements and returns the revocation as a tagged BEEF.
 // This method creates spending transactions to invalidate the specified advertisements.
-//
-// Parameters:
-//   - advertisements: Array of advertisements to revoke
-//
-// Returns:
-//   - types.TaggedBEEF: The revocation transactions as a tagged BEEF structure
-//   - error: An error if revocation fails, nil otherwise
-func (w *WalletAdvertiser) RevokeAdvertisements(advertisements []types.Advertisement) (types.TaggedBEEF, error) {
+func (w *WalletAdvertiser) RevokeAdvertisements(advertisements []*oa.Advertisement) (overlay.TaggedBEEF, error) {
 	if !w.initialized {
-		return types.TaggedBEEF{}, fmt.Errorf("WalletAdvertiser must be initialized before revoking advertisements")
+		return overlay.TaggedBEEF{}, fmt.Errorf("WalletAdvertiser must be initialized before revoking advertisements")
 	}
 
 	if len(advertisements) == 0 {
-		return types.TaggedBEEF{}, fmt.Errorf("at least one advertisement is required for revocation")
+		return overlay.TaggedBEEF{}, fmt.Errorf("at least one advertisement is required for revocation")
 	}
 
 	// Validate all advertisements have the required revocation data
 	var topics []string
 	for i, ad := range advertisements {
 		if len(ad.Beef) == 0 {
-			return types.TaggedBEEF{}, fmt.Errorf("advertisement at index %d is missing BEEF data required for revocation", i)
+			return overlay.TaggedBEEF{}, fmt.Errorf("advertisement at index %d is missing BEEF data required for revocation", i)
 		}
-		if ad.OutputIndex == nil {
-			return types.TaggedBEEF{}, fmt.Errorf("advertisement at index %d is missing output index required for revocation", i)
+		if ad.OutputIndex == 0 {
+			return overlay.TaggedBEEF{}, fmt.Errorf("advertisement at index %d is missing output index required for revocation", i)
 		}
 
 		// Collect topics for the TaggedBEEF
-		if ad.Protocol == types.ProtocolSHIP {
+		if ad.Protocol == overlay.ProtocolSHIP {
 			topics = append(topics, "tm_"+ad.TopicOrService)
-		} else if ad.Protocol == types.ProtocolSLAP {
+		} else if ad.Protocol == overlay.ProtocolSLAP {
 			topics = append(topics, "tm_"+ad.TopicOrService)
 		}
 	}
 
 	// Create spending transactions that consume the advertisement UTXOs
-	revocationTransactions, err := w.createRevocationTransactions(advertisements)
+	revocationTransactions, err := w.createNewRevocationTransactions(advertisements)
 	if err != nil {
-		return types.TaggedBEEF{}, fmt.Errorf("failed to create revocation transactions: %w", err)
+		return overlay.TaggedBEEF{}, fmt.Errorf("failed to create revocation transactions: %w", err)
 	}
 
 	// Encode the revocation transactions as BEEF format
 	beefData, err := w.encodeTransactionsAsBEEF(revocationTransactions)
 	if err != nil {
-		return types.TaggedBEEF{}, fmt.Errorf("failed to encode revocation transactions as BEEF: %w", err)
+		return overlay.TaggedBEEF{}, fmt.Errorf("failed to encode revocation transactions as BEEF: %w", err)
 	}
 
-	return types.TaggedBEEF{
-		BEEF:   beefData,
+	return overlay.TaggedBEEF{
+		Beef:   beefData,
 		Topics: topics,
 	}, nil
 }
 
 // ParseAdvertisement parses an output script to extract advertisement information.
 // This method decodes PushDrop locking scripts to reconstruct advertisement data.
-//
-// Parameters:
-//   - outputScript: The output script to parse (in byte format)
-//
-// Returns:
-//   - types.Advertisement: The parsed advertisement information
-//   - error: An error if parsing fails, nil otherwise
-func (w *WalletAdvertiser) ParseAdvertisement(outputScript types.Script) (types.Advertisement, error) {
+func (w *WalletAdvertiser) ParseAdvertisement(outputScript *script.Script) (*oa.Advertisement, error) {
 	if !w.initialized {
-		return types.Advertisement{}, fmt.Errorf("WalletAdvertiser must be initialized before parsing advertisements")
+		return nil, fmt.Errorf("WalletAdvertiser must be initialized before parsing advertisements")
 	}
 
-	if len(outputScript) == 0 {
-		return types.Advertisement{}, fmt.Errorf("output script cannot be empty")
+	if outputScript == nil || len(*outputScript) == 0 {
+		return nil, fmt.Errorf("output script cannot be empty")
 	}
 
 	// Convert script to hex string for PushDrop decoder
-	scriptHex := hex.EncodeToString(outputScript)
+	scriptHex := hex.EncodeToString(*outputScript)
 
 	// Decode the PushDrop locking script
-	result, err := w.pushDropDecoder.Decode(scriptHex)
+	s, err := script.NewFromHex(scriptHex)
 	if err != nil {
-		return types.Advertisement{}, fmt.Errorf("failed to decode PushDrop locking script: %w", err)
+		return nil, fmt.Errorf("failed to create script from hex: %w", err)
+	}
+
+	result := pushdrop.Decode(s)
+	if result == nil {
+		return nil, fmt.Errorf("failed to decode PushDrop script: %s", scriptHex)
 	}
 
 	// Validate that we have the expected number of fields
 	if len(result.Fields) < 4 {
-		return types.Advertisement{}, fmt.Errorf("invalid PushDrop result: expected at least 4 fields, got %d", len(result.Fields))
+		return nil, fmt.Errorf("invalid PushDrop result: expected at least 4 fields, got %d", len(result.Fields))
 	}
 
 	// Extract and validate protocol identifier
-	protocolIdentifier := w.utils.ToUTF8(result.Fields[0])
-	var protocol types.Protocol
-	switch protocolIdentifier {
-	case SHIPProtocol:
-		protocol = types.ProtocolSHIP
-	case SLAPProtocol:
-		protocol = types.ProtocolSLAP
+	protocolIdentifier := string(result.Fields[0])
+	protocol := overlay.Protocol(protocolIdentifier)
+	switch protocol {
+	case overlay.ProtocolSHIP, overlay.ProtocolSLAP:
 	default:
-		return types.Advertisement{}, fmt.Errorf("unsupported protocol identifier: %s", protocolIdentifier)
+		return nil, fmt.Errorf("unsupported protocol identifier: %s", protocolIdentifier)
 	}
 
 	// Extract other fields
-	identityKey := w.utils.ToHex(result.Fields[1])
-	domain := w.utils.ToUTF8(result.Fields[2])
-	topicOrService := w.utils.ToUTF8(result.Fields[3])
+	identityKey := hex.EncodeToString(result.Fields[1])
+	domain := string(result.Fields[2])
+	topicOrService := string(result.Fields[3])
 
 	// Validate topic or service name
 	var fullTopicOrService string
-	if protocol == types.ProtocolSHIP {
+	if protocol == overlay.ProtocolSHIP {
 		fullTopicOrService = "tm_" + topicOrService
 	} else {
 		fullTopicOrService = "ls_" + topicOrService
 	}
 
 	if !utils.IsValidTopicOrServiceName(fullTopicOrService) {
-		return types.Advertisement{}, fmt.Errorf("invalid topic or service name: %s", fullTopicOrService)
+		return nil, fmt.Errorf("invalid topic or service name: %s", fullTopicOrService)
 	}
 
-	return types.Advertisement{
+	return &oa.Advertisement{
 		Protocol:       protocol,
 		IdentityKey:    identityKey,
 		Domain:         domain,
@@ -386,9 +305,9 @@ func (w *WalletAdvertiser) ParseAdvertisement(outputScript types.Script) (types.
 }
 
 // validateAdvertisementData validates a single advertisement data entry
-func (w *WalletAdvertiser) validateAdvertisementData(adData types.AdvertisementData) error {
+func (w *WalletAdvertiser) validateAdvertisementData(adData *oa.AdvertisementData) error {
 	// Validate protocol
-	if adData.Protocol != types.ProtocolSHIP && adData.Protocol != types.ProtocolSLAP {
+	if adData.Protocol != overlay.ProtocolSHIP && adData.Protocol != overlay.ProtocolSLAP {
 		return fmt.Errorf("unsupported protocol: %s (must be 'SHIP' or 'SLAP')", adData.Protocol)
 	}
 
@@ -399,7 +318,7 @@ func (w *WalletAdvertiser) validateAdvertisementData(adData types.AdvertisementD
 
 	// Construct full name with appropriate prefix
 	var fullName string
-	if adData.Protocol == types.ProtocolSHIP {
+	if adData.Protocol == overlay.ProtocolSHIP {
 		fullName = "tm_" + adData.TopicOrServiceName
 	} else {
 		fullName = "ls_" + adData.TopicOrServiceName
@@ -543,32 +462,16 @@ func (w *WalletAdvertiser) setupCryptographicContexts() error {
 		return fmt.Errorf("failed to access secure random number generator: %w", err)
 	}
 
-	// Verify that both utilities are functional by testing basic operations
-	testData := []byte("test")
-	if w.utils.ToUTF8(testData) != "test" {
-		return fmt.Errorf("utils UTF-8 conversion is not working correctly")
-	}
-
-	expectedHex := hex.EncodeToString(testData)
-	if w.utils.ToHex(testData) != expectedHex {
-		return fmt.Errorf("utils hex conversion is not working correctly")
-	}
-
 	// Test PushDrop decoder with a minimal valid script
 	// This helps catch configuration issues early
 	testScript := "5101015101020151030351040451050551060651070851080951090a510b0c510d0e510f1051111251131451151651171851191a511b1c511d1e511f2051212251232451252651272851292a512b2c512d2e512f30"
-	_, err := w.pushDropDecoder.Decode(testScript)
-	if err != nil {
-		// This is acceptable - the test script might not be valid for this decoder
-		// We just want to ensure the decoder is responding and not misconfigured
-		// A decoder error is better than a panic or configuration error
-	}
-
+	s, _ := script.NewFromHex(testScript)
+	_ = pushdrop.Decode(s)
 	return nil
 }
 
 // createAdvertisementTransactions creates BSV transactions for the given advertisement data
-func (w *WalletAdvertiser) createAdvertisementTransactions(adsData []types.AdvertisementData) ([]*Transaction, error) {
+func (w *WalletAdvertiser) createAdvertisementTransactions(adsData []*oa.AdvertisementData) ([]*Transaction, error) {
 	var transactions []*Transaction
 
 	for _, adData := range adsData {
@@ -583,7 +486,7 @@ func (w *WalletAdvertiser) createAdvertisementTransactions(adsData []types.Adver
 }
 
 // createSingleAdvertisementTransaction creates a single advertisement transaction
-func (w *WalletAdvertiser) createSingleAdvertisementTransaction(adData types.AdvertisementData) (*Transaction, error) {
+func (w *WalletAdvertiser) createSingleAdvertisementTransaction(adData *oa.AdvertisementData) (*Transaction, error) {
 	// Create PushDrop locking script for the advertisement
 	lockingScript, err := w.createPushDropScript(adData)
 	if err != nil {
@@ -607,7 +510,7 @@ func (w *WalletAdvertiser) createSingleAdvertisementTransaction(adData types.Adv
 }
 
 // createPushDropScript creates a PushDrop locking script for the advertisement
-func (w *WalletAdvertiser) createPushDropScript(adData types.AdvertisementData) ([]byte, error) {
+func (w *WalletAdvertiser) createPushDropScript(adData *oa.AdvertisementData) ([]byte, error) {
 	// Derive identity key from private key (simplified approach)
 	identityKey, err := w.deriveIdentityKey()
 	if err != nil {
@@ -886,7 +789,7 @@ func (w *WalletAdvertiser) encodeUint64(value uint64) []byte {
 }
 
 // queryStorageForAdvertisements queries the storage service for advertisements of a specific protocol
-func (w *WalletAdvertiser) queryStorageForAdvertisements(protocol string) ([]types.Advertisement, error) {
+func (w *WalletAdvertiser) queryStorageForAdvertisements(protocol string) ([]oa.Advertisement, error) {
 	// Return mock data in test mode
 	if w.testMode {
 		return w.getMockAdvertisements(protocol), nil
@@ -946,9 +849,83 @@ func (w *WalletAdvertiser) queryStorageForAdvertisements(protocol string) ([]typ
 	}
 
 	// Convert storage format to our Advertisement format
-	var advertisements []types.Advertisement
+	var advertisements []oa.Advertisement
 	for _, storageAd := range storageResponse.Advertisements {
 		ad, err := w.convertStorageToAdvertisement(storageAd)
+		if err != nil {
+			// Log the error but continue processing other advertisements
+			continue
+		}
+		advertisements = append(advertisements, ad)
+	}
+
+	return advertisements, nil
+}
+
+// queryStorageForNewAdvertisements queries the storage service for advertisements of a specific protocol (new types)
+func (w *WalletAdvertiser) queryStorageForNewAdvertisements(protocol overlay.Protocol) ([]*oa.Advertisement, error) {
+	// Return mock data in test mode
+	if w.testMode {
+		return w.getNewMockAdvertisements(protocol), nil
+	}
+
+	// Create HTTP client with timeout
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+
+	// Construct the query URL based on the storage service API
+	// This assumes a RESTful API pattern - actual implementation may vary
+	queryURL, err := url.Parse(w.storageURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid storage URL: %w", err)
+	}
+
+	// Add query parameters for protocol filtering
+	queryURL.Path = "/advertisements"
+	queryParams := queryURL.Query()
+	queryParams.Set("protocol", string(protocol))
+	queryParams.Set("limit", "1000") // Reasonable default limit
+	queryURL.RawQuery = queryParams.Encode()
+
+	// Make the HTTP request
+	resp, err := client.Get(queryURL.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to query storage service: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Check response status
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("storage service returned error %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Read and parse the response
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	// Parse the JSON response
+	var storageResponse struct {
+		Advertisements []StorageAdvertisement `json:"advertisements"`
+		Total          int                    `json:"total"`
+		Error          string                 `json:"error,omitempty"`
+	}
+
+	if err := json.Unmarshal(body, &storageResponse); err != nil {
+		return nil, fmt.Errorf("failed to parse storage response: %w", err)
+	}
+
+	if storageResponse.Error != "" {
+		return nil, fmt.Errorf("storage service error: %s", storageResponse.Error)
+	}
+
+	// Convert storage format to our Advertisement format
+	var advertisements []*oa.Advertisement
+	for _, storageAd := range storageResponse.Advertisements {
+		ad, err := w.convertStorageToNewAdvertisement(storageAd)
 		if err != nil {
 			// Log the error but continue processing other advertisements
 			continue
@@ -975,16 +952,16 @@ type StorageAdvertisement struct {
 }
 
 // convertStorageToAdvertisement converts a storage advertisement to our Advertisement type
-func (w *WalletAdvertiser) convertStorageToAdvertisement(storageAd StorageAdvertisement) (types.Advertisement, error) {
+func (w *WalletAdvertiser) convertStorageToAdvertisement(storageAd StorageAdvertisement) (oa.Advertisement, error) {
 	// Convert protocol string to Protocol type
-	var protocol types.Protocol
+	var protocol overlay.Protocol
 	switch storageAd.Protocol {
 	case "SHIP":
-		protocol = types.ProtocolSHIP
+		protocol = overlay.ProtocolSHIP
 	case "SLAP":
-		protocol = types.ProtocolSLAP
+		protocol = overlay.ProtocolSLAP
 	default:
-		return types.Advertisement{}, fmt.Errorf("unknown protocol: %s", storageAd.Protocol)
+		return oa.Advertisement{}, fmt.Errorf("unknown protocol: %s", storageAd.Protocol)
 	}
 
 	// Decode BEEF data if present
@@ -993,17 +970,60 @@ func (w *WalletAdvertiser) convertStorageToAdvertisement(storageAd StorageAdvert
 		var err error
 		beefData, err = w.decodeBEEFFromStorage(storageAd.BEEF)
 		if err != nil {
-			return types.Advertisement{}, fmt.Errorf("failed to decode BEEF data: %w", err)
+			return oa.Advertisement{}, fmt.Errorf("failed to decode BEEF data: %w", err)
 		}
 	}
 
-	return types.Advertisement{
+	var outputIndex uint32 = 0
+	if storageAd.OutputIndex != nil {
+		outputIndex = uint32(*storageAd.OutputIndex)
+	}
+
+	return oa.Advertisement{
 		Protocol:       protocol,
 		IdentityKey:    storageAd.IdentityKey,
 		Domain:         storageAd.Domain,
 		TopicOrService: storageAd.TopicOrService,
 		Beef:           beefData,
-		OutputIndex:    storageAd.OutputIndex,
+		OutputIndex:    outputIndex,
+	}, nil
+}
+
+// convertStorageToNewAdvertisement converts a storage advertisement to our Advertisement type (new types)
+func (w *WalletAdvertiser) convertStorageToNewAdvertisement(storageAd StorageAdvertisement) (*oa.Advertisement, error) {
+	// Convert protocol string to Protocol type
+	var protocol overlay.Protocol
+	switch storageAd.Protocol {
+	case "SHIP":
+		protocol = overlay.ProtocolSHIP
+	case "SLAP":
+		protocol = overlay.ProtocolSLAP
+	default:
+		return nil, fmt.Errorf("unknown protocol: %s", storageAd.Protocol)
+	}
+
+	// Decode BEEF data if present
+	var beefData []byte
+	if storageAd.BEEF != "" {
+		var err error
+		beefData, err = w.decodeBEEFFromStorage(storageAd.BEEF)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode BEEF data: %w", err)
+		}
+	}
+
+	var outputIndex uint32 = 0
+	if storageAd.OutputIndex != nil {
+		outputIndex = uint32(*storageAd.OutputIndex)
+	}
+
+	return &oa.Advertisement{
+		Protocol:       protocol,
+		IdentityKey:    storageAd.IdentityKey,
+		Domain:         storageAd.Domain,
+		TopicOrService: storageAd.TopicOrService,
+		Beef:           beefData,
+		OutputIndex:    outputIndex,
 	}, nil
 }
 
@@ -1038,7 +1058,7 @@ func min(a, b int) int {
 }
 
 // createRevocationTransactions creates spending transactions to revoke advertisements
-func (w *WalletAdvertiser) createRevocationTransactions(advertisements []types.Advertisement) ([]*Transaction, error) {
+func (w *WalletAdvertiser) createRevocationTransactions(advertisements []oa.Advertisement) ([]*Transaction, error) {
 	var transactions []*Transaction
 
 	for i, ad := range advertisements {
@@ -1052,8 +1072,23 @@ func (w *WalletAdvertiser) createRevocationTransactions(advertisements []types.A
 	return transactions, nil
 }
 
+// createNewRevocationTransactions creates spending transactions to revoke advertisements (new types)
+func (w *WalletAdvertiser) createNewRevocationTransactions(advertisements []*oa.Advertisement) ([]*Transaction, error) {
+	var transactions []*Transaction
+
+	for i, ad := range advertisements {
+		tx, err := w.createSingleNewRevocationTransaction(ad)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create revocation transaction for advertisement %d: %w", i, err)
+		}
+		transactions = append(transactions, tx)
+	}
+
+	return transactions, nil
+}
+
 // createSingleRevocationTransaction creates a single revocation transaction
-func (w *WalletAdvertiser) createSingleRevocationTransaction(ad types.Advertisement) (*Transaction, error) {
+func (w *WalletAdvertiser) createSingleRevocationTransaction(ad oa.Advertisement) (*Transaction, error) {
 	// Parse the BEEF data to extract the original transaction
 	originalTx, err := w.parseTransactionFromBEEF(ad.Beef)
 	if err != nil {
@@ -1067,7 +1102,40 @@ func (w *WalletAdvertiser) createSingleRevocationTransaction(ad types.Advertisem
 			{
 				PreviousOutput: OutPoint{
 					Hash:  w.calculateTransactionHash(originalTx),
-					Index: uint32(*ad.OutputIndex),
+					Index: ad.OutputIndex,
+				},
+				ScriptSig: w.createRevocationScriptSig(),
+				Sequence:  0xffffffff,
+			},
+		},
+		Outputs: []TransactionOutput{
+			{
+				Value:         1, // Minimal output to make transaction valid
+				LockingScript: w.createSimpleLockingScript(),
+			},
+		},
+		LockTime: 0,
+	}
+
+	return revocationTx, nil
+}
+
+// createSingleNewRevocationTransaction creates a single revocation transaction (new types)
+func (w *WalletAdvertiser) createSingleNewRevocationTransaction(ad *oa.Advertisement) (*Transaction, error) {
+	// Parse the BEEF data to extract the original transaction
+	originalTx, err := w.parseTransactionFromBEEF(ad.Beef)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse original transaction from BEEF: %w", err)
+	}
+
+	// Create the spending transaction
+	revocationTx := &Transaction{
+		Version: 1,
+		Inputs: []TransactionInput{
+			{
+				PreviousOutput: OutPoint{
+					Hash:  w.calculateTransactionHash(originalTx),
+					Index: ad.OutputIndex,
 				},
 				ScriptSig: w.createRevocationScriptSig(),
 				Sequence:  0xffffffff,
@@ -1206,24 +1274,37 @@ func (w *WalletAdvertiser) createSimpleLockingScript() []byte {
 }
 
 // getMockAdvertisements returns mock advertisement data for testing
-func (w *WalletAdvertiser) getMockAdvertisements(protocol string) []types.Advertisement {
-	var prot types.Protocol
+func (w *WalletAdvertiser) getMockAdvertisements(protocol string) []oa.Advertisement {
+	var prot overlay.Protocol
 	if protocol == "SHIP" {
-		prot = types.ProtocolSHIP
+		prot = overlay.ProtocolSHIP
 	} else {
-		prot = types.ProtocolSLAP
+		prot = overlay.ProtocolSLAP
 	}
 
 	// Return sample advertisement data
-	outputIndex := 0
-	return []types.Advertisement{
+	return []oa.Advertisement{
 		{
 			Protocol:       prot,
 			IdentityKey:    "02abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
 			Domain:         "example.com",
 			TopicOrService: "test_service",
 			Beef:           []byte("mock-beef-data"),
-			OutputIndex:    &outputIndex,
+			OutputIndex:    1,
+		},
+	}
+}
+
+// getNewMockAdvertisements returns mock advertisement data for testing (new types)
+func (w *WalletAdvertiser) getNewMockAdvertisements(protocol overlay.Protocol) []*oa.Advertisement {
+	return []*oa.Advertisement{
+		{
+			Protocol:       protocol,
+			IdentityKey:    "02abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+			Domain:         "example.com",
+			TopicOrService: "test_service",
+			Beef:           []byte("mock-beef-data"),
+			OutputIndex:    1,
 		},
 	}
 }

@@ -47,7 +47,7 @@ Initializes the advertiser and validates dependencies are set.
 
 #### Advertisement Creation
 ```go
-func (w *WalletAdvertiser) CreateAdvertisements(adsData []AdvertisementData) (TaggedBEEF, error)
+func (w *WalletAdvertiser) CreateAdvertisements(adsData []*oa.AdvertisementData) (overlay.TaggedBEEF, error)
 ```
 
 Creates new advertisements as BSV transactions (requires BSV SDK integration).
@@ -80,7 +80,8 @@ package main
 
 import (
     "github.com/bsv-blockchain/go-overlay-discovery-services/pkg/advertiser"
-    "github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
+    oa "github.com/bsv-blockchain/go-overlay-services/pkg/core/advertiser"
+    "github.com/bsv-blockchain/go-sdk/overlay"
 )
 
 func main() {
@@ -106,9 +107,9 @@ func main() {
     }
 
     // Create advertisements
-    adsData := []types.AdvertisementData{
+    adsData := []*oa.AdvertisementData{
         {
-            Protocol:           types.ProtocolSHIP,
+            Protocol:           overlay.ProtocolSHIP,
             TopicOrServiceName: "payments",
         },
     }

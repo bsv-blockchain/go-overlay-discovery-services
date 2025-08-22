@@ -8,8 +8,8 @@ package slap
 // for creating valid SLAP tokens.
 const TopicManagerDocumentation = `# SLAP Topic Manager
 
-**Protocol Name**: SLAP (Service Lookup Availability Protocol)  
-**Manager Name**: ` + "`SLAPTopicManager`" + `  
+**Protocol Name**: SLAP (Service Lookup Availability Protocol)
+**Manager Name**: ` + "`TopicManager`" + `
 
 ---
 
@@ -42,7 +42,7 @@ Similar to SHIP, SLAP tokens must follow a specific 5-field structure in a [Push
 
 ## Signature and Locking Key
 
-The final field is a signature that **must** link back to the identity key. The ` + "`SLAPTopicManager`" + ` uses the ` + "`isTokenSignatureCorrectlyLinked`" + ` code to confirm:
+The final field is a signature that **must** link back to the identity key. The ` + "`TopicManager`" + ` uses the ` + "`isTokenSignatureCorrectlyLinked`" + ` code to confirm:
 
 - The signature is valid for the data in the first four fields.
 - The ` + "`lockingPublicKey`" + ` of the UTXO matches the derived key from the identity key used to sign.
@@ -69,6 +69,6 @@ If any step fails, the SLAP output is rejected.
 
 ## Further Reading
 
-- **SLAPLookupService**: For how to query these records afterward.
+- **LookupService**: For how to query these records afterward.
 - **SHIP**: The complementary protocol for advertising "host-based" topics (` + "`tm_`" + `).
 `

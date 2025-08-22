@@ -1,6 +1,5 @@
 // Package ship implements the SHIP (Service Host Interconnect Protocol) topic manager functionality.
-// This package provides Go equivalents for the TypeScript SHIPTopicManager class, enabling
-// overlay network topic management and message routing for SHIP protocol.
+// Overlay network topic management and message routing for SHIP protocol.
 package ship
 
 import (
@@ -9,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
 	"github.com/bsv-blockchain/go-sdk/overlay"
 	"github.com/bsv-blockchain/go-sdk/transaction"
 )
@@ -41,30 +39,10 @@ type TopicMessage struct {
 // TopicMessageHandler is a function type for handling topic messages
 type TopicMessageHandler func(ctx context.Context, message TopicMessage) error
 
-// SHIPTopicManagerInterface defines the interface for SHIP topic management operations
-type SHIPTopicManagerInterface interface {
-	// SubscribeToTopic subscribes to a specific topic with a message handler
-	SubscribeToTopic(ctx context.Context, topic string, handler TopicMessageHandler) error
-	// UnsubscribeFromTopic unsubscribes from a specific topic
-	UnsubscribeFromTopic(ctx context.Context, topic string) error
-	// HandleTopicMessage processes an incoming topic message
-	HandleTopicMessage(ctx context.Context, message TopicMessage) error
-	// GetSubscribedTopics returns all current topic subscriptions
-	GetSubscribedTopics() []TopicSubscription
-	// CreateTopicSubscription creates a new topic subscription
-	CreateTopicSubscription(ctx context.Context, topic string) (*TopicSubscription, error)
-	// IsSubscribedToTopic checks if currently subscribed to a topic
-	IsSubscribedToTopic(topic string) bool
-	// GetTopicMessageCount returns the message count for a specific topic
-	GetTopicMessageCount(topic string) int64
-	// Close cleanly shuts down the topic manager
-	Close(ctx context.Context) error
-}
-
-// SHIPTopicManager implements topic management functionality for SHIP protocol.
+// TopicManager implements topic management functionality for SHIP protocol.
 // It provides capabilities for subscribing to overlay network topics, handling messages,
 // and managing topic lifecycle within the SHIP ecosystem.
-type SHIPTopicManager struct {
+type TopicManager struct {
 	// subscriptions holds all active topic subscriptions
 	subscriptions map[string]*TopicSubscription
 	// handlers holds message handlers for each subscribed topic
@@ -72,26 +50,16 @@ type SHIPTopicManager struct {
 	// mutex protects concurrent access to subscriptions and handlers
 	mutex sync.RWMutex
 	// storage provides access to SHIP storage operations
-	storage SHIPStorageInterface
+	storage StorageInterface
 	// lookupService provides access to SHIP lookup operations (optional integration)
-	lookupService *SHIPLookupService
+	lookupService *LookupService
 }
 
-// Compile-time verification that SHIPTopicManager implements SHIPTopicManagerInterface
-var _ SHIPTopicManagerInterface = (*SHIPTopicManager)(nil)
-
-// NewSHIPTopicManager creates a new SHIP topic manager instance.
+// NewTopicManager creates a new SHIP topic manager instance.
 // This constructor initializes the topic manager with the required dependencies
 // for managing overlay network topic subscriptions and message routing.
-//
-// Parameters:
-//   - storage: The SHIP storage implementation for data persistence
-//   - lookupService: Optional SHIP lookup service for integration (can be nil)
-//
-// Returns:
-//   - *SHIPTopicManager: A new SHIP topic manager instance
-func NewSHIPTopicManager(storage SHIPStorageInterface, lookupService *SHIPLookupService) *SHIPTopicManager {
-	return &SHIPTopicManager{
+func NewTopicManager(storage StorageInterface, lookupService *LookupService) *TopicManager {
+	return &TopicManager{
 		subscriptions: make(map[string]*TopicSubscription),
 		handlers:      make(map[string]TopicMessageHandler),
 		storage:       storage,
@@ -102,15 +70,7 @@ func NewSHIPTopicManager(storage SHIPStorageInterface, lookupService *SHIPLookup
 // SubscribeToTopic subscribes to a specific topic with a message handler.
 // Creates a new subscription if one doesn't exist, or updates an existing one.
 // The provided handler will be called for all messages received on this topic.
-//
-// Parameters:
-//   - ctx: Context for the operation
-//   - topic: The topic name to subscribe to
-//   - handler: The message handler function to call for messages on this topic
-//
-// Returns:
-//   - error: An error if the subscription fails, nil otherwise
-func (tm *SHIPTopicManager) SubscribeToTopic(ctx context.Context, topic string, handler TopicMessageHandler) error {
+func (tm *TopicManager) SubscribeToTopic(ctx context.Context, topic string, handler TopicMessageHandler) error {
 	if topic == "" {
 		return fmt.Errorf("topic name cannot be empty")
 	}
@@ -146,14 +106,7 @@ func (tm *SHIPTopicManager) SubscribeToTopic(ctx context.Context, topic string, 
 // UnsubscribeFromTopic unsubscribes from a specific topic.
 // Marks the subscription as inactive and removes the message handler.
 // The subscription record is kept for historical purposes.
-//
-// Parameters:
-//   - ctx: Context for the operation
-//   - topic: The topic name to unsubscribe from
-//
-// Returns:
-//   - error: An error if the unsubscription fails, nil otherwise
-func (tm *SHIPTopicManager) UnsubscribeFromTopic(ctx context.Context, topic string) error {
+func (tm *TopicManager) UnsubscribeFromTopic(ctx context.Context, topic string) error {
 	if topic == "" {
 		return fmt.Errorf("topic name cannot be empty")
 	}
@@ -178,14 +131,7 @@ func (tm *SHIPTopicManager) UnsubscribeFromTopic(ctx context.Context, topic stri
 // HandleTopicMessage processes an incoming topic message.
 // Routes the message to the appropriate handler if one exists for the topic.
 // Updates message statistics for the topic.
-//
-// Parameters:
-//   - ctx: Context for the operation
-//   - message: The topic message to process
-//
-// Returns:
-//   - error: An error if message handling fails, nil otherwise
-func (tm *SHIPTopicManager) HandleTopicMessage(ctx context.Context, message TopicMessage) error {
+func (tm *TopicManager) HandleTopicMessage(ctx context.Context, message TopicMessage) error {
 	if message.Topic == "" {
 		return fmt.Errorf("message topic cannot be empty")
 	}
@@ -220,10 +166,7 @@ func (tm *SHIPTopicManager) HandleTopicMessage(ctx context.Context, message Topi
 
 // GetSubscribedTopics returns all current topic subscriptions.
 // Returns a copy of subscription data to prevent external modification.
-//
-// Returns:
-//   - []TopicSubscription: A slice of all topic subscriptions
-func (tm *SHIPTopicManager) GetSubscribedTopics() []TopicSubscription {
+func (tm *TopicManager) GetSubscribedTopics() []TopicSubscription {
 	tm.mutex.RLock()
 	defer tm.mutex.RUnlock()
 
@@ -238,15 +181,7 @@ func (tm *SHIPTopicManager) GetSubscribedTopics() []TopicSubscription {
 
 // CreateTopicSubscription creates a new topic subscription without a handler.
 // This method is useful for creating subscription records before setting up handlers.
-//
-// Parameters:
-//   - ctx: Context for the operation
-//   - topic: The topic name to create a subscription for
-//
-// Returns:
-//   - *TopicSubscription: The created subscription
-//   - error: An error if creation fails, nil otherwise
-func (tm *SHIPTopicManager) CreateTopicSubscription(ctx context.Context, topic string) (*TopicSubscription, error) {
+func (tm *TopicManager) CreateTopicSubscription(ctx context.Context, topic string) (*TopicSubscription, error) {
 	if topic == "" {
 		return nil, fmt.Errorf("topic name cannot be empty")
 	}
@@ -274,13 +209,7 @@ func (tm *SHIPTopicManager) CreateTopicSubscription(ctx context.Context, topic s
 
 // IsSubscribedToTopic checks if currently subscribed to a topic.
 // Only returns true for active subscriptions.
-//
-// Parameters:
-//   - topic: The topic name to check
-//
-// Returns:
-//   - bool: True if actively subscribed to the topic, false otherwise
-func (tm *SHIPTopicManager) IsSubscribedToTopic(topic string) bool {
+func (tm *TopicManager) IsSubscribedToTopic(topic string) bool {
 	tm.mutex.RLock()
 	defer tm.mutex.RUnlock()
 
@@ -290,13 +219,7 @@ func (tm *SHIPTopicManager) IsSubscribedToTopic(topic string) bool {
 
 // GetTopicMessageCount returns the message count for a specific topic.
 // Returns 0 if the topic is not subscribed to.
-//
-// Parameters:
-//   - topic: The topic name to get the message count for
-//
-// Returns:
-//   - int64: The number of messages received on this topic
-func (tm *SHIPTopicManager) GetTopicMessageCount(topic string) int64 {
+func (tm *TopicManager) GetTopicMessageCount(topic string) int64 {
 	tm.mutex.RLock()
 	defer tm.mutex.RUnlock()
 
@@ -308,13 +231,7 @@ func (tm *SHIPTopicManager) GetTopicMessageCount(topic string) int64 {
 
 // Close cleanly shuts down the topic manager.
 // Unsubscribes from all topics and cleans up resources.
-//
-// Parameters:
-//   - ctx: Context for the shutdown operation
-//
-// Returns:
-//   - error: An error if shutdown fails, nil otherwise
-func (tm *SHIPTopicManager) Close(ctx context.Context) error {
+func (tm *TopicManager) Close(ctx context.Context) error {
 	tm.mutex.Lock()
 	defer tm.mutex.Unlock()
 
@@ -331,21 +248,15 @@ func (tm *SHIPTopicManager) Close(ctx context.Context) error {
 
 // GetTopicManagerMetaData returns metadata information for the SHIP topic manager.
 // This provides basic information about the topic manager service.
-//
-// Returns:
-//   - types.MetaData: The topic manager metadata
-func (tm *SHIPTopicManager) GetTopicManagerMetaData() types.MetaData {
-	return types.MetaData{
-		Name:             "SHIP Topic Manager",
-		ShortDescription: "Manages overlay network topic subscriptions for SHIP protocol.",
+func (tm *TopicManager) GetTopicManagerMetaData() overlay.MetaData {
+	return overlay.MetaData{
+		Name:        "SHIP Topic Manager",
+		Description: "Manages overlay network topic subscriptions for SHIP protocol.",
 	}
 }
 
 // GetActiveTopicCount returns the number of currently active topic subscriptions.
-//
-// Returns:
-//   - int: The number of active subscriptions
-func (tm *SHIPTopicManager) GetActiveTopicCount() int {
+func (tm *TopicManager) GetActiveTopicCount() int {
 	tm.mutex.RLock()
 	defer tm.mutex.RUnlock()
 
@@ -359,10 +270,7 @@ func (tm *SHIPTopicManager) GetActiveTopicCount() int {
 }
 
 // GetTotalMessageCount returns the total number of messages processed across all topics.
-//
-// Returns:
-//   - int64: The total message count
-func (tm *SHIPTopicManager) GetTotalMessageCount() int64 {
+func (tm *TopicManager) GetTotalMessageCount() int64 {
 	tm.mutex.RLock()
 	defer tm.mutex.RUnlock()
 
@@ -375,7 +283,7 @@ func (tm *SHIPTopicManager) GetTotalMessageCount() int64 {
 
 // IdentifyAdmissibleOutputs implements the engine.TopicManager interface
 // For SHIP, this identifies outputs that should be admitted to the overlay
-func (tm *SHIPTopicManager) IdentifyAdmissibleOutputs(ctx context.Context, beef []byte, previousCoins map[uint32]*transaction.TransactionOutput) (overlay.AdmittanceInstructions, error) {
+func (tm *TopicManager) IdentifyAdmissibleOutputs(ctx context.Context, beef []byte, previousCoins map[uint32]*transaction.TransactionOutput) (overlay.AdmittanceInstructions, error) {
 	// SHIP topic manager doesn't admit outputs directly - it manages service discovery
 	// Return empty admissible list
 	return overlay.AdmittanceInstructions{
@@ -385,20 +293,20 @@ func (tm *SHIPTopicManager) IdentifyAdmissibleOutputs(ctx context.Context, beef 
 
 // IdentifyNeededInputs implements the engine.TopicManager interface
 // For SHIP, this identifies inputs needed for validation
-func (tm *SHIPTopicManager) IdentifyNeededInputs(ctx context.Context, beef []byte) ([]*transaction.Outpoint, error) {
+func (tm *TopicManager) IdentifyNeededInputs(ctx context.Context, beef []byte) ([]*transaction.Outpoint, error) {
 	// SHIP doesn't require specific inputs for validation
 	return []*transaction.Outpoint{}, nil
 }
 
 // GetDocumentation implements the engine.TopicManager interface
 // Returns documentation for the SHIP topic manager
-func (tm *SHIPTopicManager) GetDocumentation() string {
+func (tm *TopicManager) GetDocumentation() string {
 	return TopicManagerDocumentation
 }
 
 // GetMetaData implements the engine.TopicManager interface
 // Returns metadata about the SHIP topic manager
-func (tm *SHIPTopicManager) GetMetaData() *overlay.MetaData {
+func (tm *TopicManager) GetMetaData() *overlay.MetaData {
 	return &overlay.MetaData{
 		Name:        "SHIP Topic Manager",
 		Description: "Manages SHIP protocol topics for service host interconnection and discovery",
