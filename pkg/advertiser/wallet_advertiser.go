@@ -13,7 +13,12 @@ import (
 	"github.com/bsv-blockchain/go-sdk/transaction/template/pushdrop"
 	"github.com/bsv-blockchain/go-sdk/wallet"
 	"github.com/bsv-blockchain/go-wallet-toolbox/pkg/defs"
+	"github.com/bsv-blockchain/go-wallet-toolbox/pkg/infra"
+	"github.com/bsv-blockchain/go-wallet-toolbox/pkg/services"
+	"github.com/bsv-blockchain/go-wallet-toolbox/pkg/storage"
+	"github.com/bsv-blockchain/go-wallet-toolbox/pkg/wdk"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -165,18 +170,37 @@ func (w *WalletAdvertiser) CreateAdvertisements(adsData []*oa.AdvertisementData)
 	if err != nil {
 		return overlay.TaggedBEEF{}, fmt.Errorf("failed to create private key from hex: %w", err)
 	}
-	wlt, err := toolboxWallet.New(defs.NetworkMainnet, privKey)
+	logger := slog.Default()
+	cfg := infra.Defaults()
+	cfg.ServerPrivateKey = w.privateKey
+	activeServices := services.New(logger, cfg.Services)
+
+	storageManager, err := storage.NewGORMProvider(context.TODO(), logger, storage.GORMProviderConfig{
+		DB:                    cfg.DBConfig,
+		Chain:                 cfg.BSVNetwork,
+		FeeModel:              cfg.FeeModel,
+		Commission:            cfg.Commission,
+		Services:              activeServices,
+		SynchronizeTxStatuses: cfg.SynchronizeTxStatuses,
+	})
+
+	storageIdentityKey, err := wdk.IdentityKey(cfg.ServerPrivateKey)
+	if err != nil {
+		return overlay.TaggedBEEF{}, fmt.Errorf("failed to create storage identity key: %w", err)
+	}
+
+	if _, err := storageManager.Migrate(context.TODO(), cfg.Name, storageIdentityKey); err != nil {
+		return overlay.TaggedBEEF{}, fmt.Errorf("failed to migrate storage: %w", err)
+	}
+
+	wlt, err := toolboxWallet.New(defs.NetworkMainnet, privKey, storageManager)
 	if err != nil {
 		return overlay.TaggedBEEF{}, fmt.Errorf("failed to create wallet: %w", err)
-	}
-	protoWallet, err := wallet.NewCompletedProtoWallet(privKey)
-	if err != nil {
-		return overlay.TaggedBEEF{}, fmt.Errorf("failed to create proto wallet: %w", err)
 	}
 	keyDeriver := wallet.NewKeyDeriver(privKey)
 
 	pd := pushdrop.PushDrop{
-		Wallet: protoWallet,
+		Wallet: wlt,
 	}
 
 	var outputs []wallet.CreateActionOutput
@@ -218,7 +242,7 @@ func (w *WalletAdvertiser) CreateAdvertisements(adsData []*oa.AdvertisementData)
 		})
 	}
 
-	createActionResult, err := protoWallet.CreateAction(context.TODO(), wallet.CreateActionArgs{
+	createActionResult, err := wlt.CreateAction(context.TODO(), wallet.CreateActionArgs{
 		Outputs:     outputs,
 		Description: "SHIP/SLAP Advertisement Issuance",
 	}, "")
