@@ -2,6 +2,7 @@
 package advertiser
 
 import (
+	"encoding/hex"
 	"github.com/bsv-blockchain/go-sdk/transaction"
 	"testing"
 
@@ -148,6 +149,7 @@ func TestWalletAdvertiser_Init(t *testing.T) {
 
 func TestWalletAdvertiser_CreateAdvertisements(t *testing.T) {
 	advertiser := setupInitializedAdvertiser(t)
+	advertiser.Finder = &MockFinder{} // Use mock finder to avoid needing wallet funding
 
 	tests := []struct {
 		name          string
@@ -221,6 +223,7 @@ func TestWalletAdvertiser_CreateAdvertisements(t *testing.T) {
 
 func TestWalletAdvertiser_FindAllAdvertisements(t *testing.T) {
 	advertiser := setupInitializedAdvertiser(t)
+	advertiser.Finder = &MockFinder{} // Use mock finder to avoid real network calls
 
 	tests := []struct {
 		name          string
@@ -336,6 +339,105 @@ func TestWalletAdvertiser_RevokeAdvertisements(t *testing.T) {
 	}
 }
 
+type MockFinder struct{}
+
+func (m *MockFinder) Advertisements(protocol overlay.Protocol) ([]*oa.Advertisement, error) {
+	return []*oa.Advertisement{
+		{
+			Protocol:       protocol,
+			IdentityKey:    "02abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+			Domain:         "example.com",
+			TopicOrService: "test_service",
+			Beef:           []byte("mock-beef-data"),
+			OutputIndex:    1,
+		},
+	}, nil
+}
+
+func (m *MockFinder) CreateAdvertisements(adsData []*oa.AdvertisementData, identityKey, advertisableURI string) (overlay.TaggedBEEF, error) {
+	// Create mock topics based on the advertisements
+	var topics []string
+	for _, adData := range adsData {
+		if adData.Protocol == overlay.ProtocolSHIP {
+			topics = append(topics, "tm_"+adData.TopicOrServiceName)
+		} else if adData.Protocol == overlay.ProtocolSLAP {
+			topics = append(topics, "tm_"+adData.TopicOrServiceName)
+		}
+	}
+
+	// Create a valid BEEF for testing that ParseAdvertisement can work with
+	// Create a simple transaction with the advertisement script
+	tx := &transaction.Transaction{
+		Version:  1,
+		LockTime: 0,
+		Inputs:   []*transaction.TransactionInput{}, // Empty inputs for test
+		Outputs: []*transaction.TransactionOutput{
+			{
+				Satoshis:      1,
+				LockingScript: createMockPushDropScript(adsData[0]),
+			},
+		},
+	}
+
+	// Create BEEF from the transaction
+	beef, err := transaction.NewBeefFromTransaction(tx)
+	if err != nil {
+		return overlay.TaggedBEEF{}, err
+	}
+
+	beefBytes, err := beef.Bytes()
+	if err != nil {
+		return overlay.TaggedBEEF{}, err
+	}
+
+	return overlay.TaggedBEEF{
+		Beef:   beefBytes,
+		Topics: topics,
+	}, nil
+}
+
+// Helper function to create a mock PushDrop script
+func createMockPushDropScript(adData *oa.AdvertisementData) *script.Script {
+	// Create a valid public key (33 bytes) - this is a known valid public key
+	pubKeyHex := "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+	pubKeyBytes, _ := hex.DecodeString(pubKeyHex)
+
+	// Start building the script
+	s := &script.Script{}
+
+	// Add public key
+	_ = s.AppendPushData(pubKeyBytes)
+
+	// Add OP_CHECKSIG
+	_ = s.AppendOpcodes(script.OpCHECKSIG)
+
+	// Prepare the 5 required fields for SHIP/SLAP advertisements
+	fields := [][]byte{
+		[]byte(string(adData.Protocol)),                 // Protocol identifier
+		[]byte{0x02, 0xfe, 0x8d, 0x1e, 0xb1, 0xbc, 0xb3, 0x43, 0x2b, 0x1d, 0xb5, 0x83, 0x3f, 0xf5, 0xf2, 0x22, 0x6d, 0x9c, 0xb5, 0xe6, 0x5c, 0xee, 0x43, 0x05, 0x58, 0xc1, 0x8e, 0xd3, 0xa3, 0xc8, 0x6c, 0xe1, 0xaf}, // Identity key (33 bytes)
+		[]byte("https://advertise-me.com"),              // Advertised URI
+		[]byte(adData.TopicOrServiceName),               // Topic
+		[]byte{0x30, 0x44, 0x02, 0x20, 0x01, 0x02, 0x03}, // Mock signature (DER format)
+	}
+
+	// Add fields using PushData
+	for _, field := range fields {
+		_ = s.AppendPushData(field)
+	}
+
+	// Add DROP operations to remove fields from stack
+	notYetDropped := len(fields)
+	for notYetDropped > 1 {
+		_ = s.AppendOpcodes(script.Op2DROP)
+		notYetDropped -= 2
+	}
+	if notYetDropped != 0 {
+		_ = s.AppendOpcodes(script.OpDROP)
+	}
+
+	return s
+}
+
 func TestWalletAdvertiser_ParseAdvertisement(t *testing.T) {
 	t.Run("Properly parses an advertisement script", func(t *testing.T) {
 		// Create advertiser with a valid test private key
@@ -350,7 +452,7 @@ func TestWalletAdvertiser_ParseAdvertisement(t *testing.T) {
 		require.NoError(t, err)
 
 		advertiser.SetSkipStorageValidation(true)
-		advertiser.SetTestMode(true)
+		advertiser.Finder = &MockFinder{}
 
 		err = advertiser.Init()
 		require.NoError(t, err)
@@ -433,7 +535,6 @@ func setupInitializedAdvertiser(t *testing.T) *WalletAdvertiser {
 	require.NoError(t, err)
 
 	advertiser.SetSkipStorageValidation(true) // Skip storage validation for tests
-	advertiser.SetTestMode(true)              // Enable test mode for mock data
 
 	err = advertiser.Init()
 	require.NoError(t, err)

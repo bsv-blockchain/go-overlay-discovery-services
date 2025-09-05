@@ -50,7 +50,6 @@ func main() {
 	// Set up mock dependencies (in a real scenario, these would be actual implementations)
 	fmt.Println("\n2. Setting up dependencies...")
 	advertiser.SetSkipStorageValidation(true) // Skip storage validation for example
-	advertiser.SetTestMode(true)              // Enable test mode for example
 	fmt.Println("✓ Dependencies configured")
 
 	// Initialize the advertiser

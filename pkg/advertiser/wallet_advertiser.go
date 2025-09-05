@@ -8,16 +8,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
-	"github.com/bsv-blockchain/go-sdk/transaction"
-	"github.com/bsv-blockchain/go-sdk/transaction/template/pushdrop"
-	"github.com/bsv-blockchain/go-sdk/wallet"
-	"github.com/bsv-blockchain/go-wallet-toolbox/pkg/defs"
-	"github.com/bsv-blockchain/go-wallet-toolbox/pkg/infra"
-	"github.com/bsv-blockchain/go-wallet-toolbox/pkg/services"
-	"github.com/bsv-blockchain/go-wallet-toolbox/pkg/storage"
-	"github.com/bsv-blockchain/go-wallet-toolbox/pkg/wdk"
-	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -27,12 +17,28 @@ import (
 	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
 	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/utils"
 	oa "github.com/bsv-blockchain/go-overlay-services/pkg/core/advertiser"
+	authhttp "github.com/bsv-blockchain/go-sdk/auth/clients/authhttp"
 	"github.com/bsv-blockchain/go-sdk/overlay"
+	"github.com/bsv-blockchain/go-sdk/overlay/lookup"
+	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	"github.com/bsv-blockchain/go-sdk/script"
+	"github.com/bsv-blockchain/go-sdk/transaction"
+	"github.com/bsv-blockchain/go-sdk/transaction/template/pushdrop"
+	"github.com/bsv-blockchain/go-sdk/wallet"
+	"github.com/bsv-blockchain/go-wallet-toolbox/pkg/defs"
+	"github.com/bsv-blockchain/go-wallet-toolbox/pkg/infra"
+	"github.com/bsv-blockchain/go-wallet-toolbox/pkg/services"
+	"github.com/bsv-blockchain/go-wallet-toolbox/pkg/storage"
 	toolboxWallet "github.com/bsv-blockchain/go-wallet-toolbox/pkg/wallet"
+	"github.com/bsv-blockchain/go-wallet-toolbox/pkg/wdk"
 )
 
 const AdTokenValue = 1
+
+type Finder interface {
+	Advertisements(protocol overlay.Protocol) ([]*oa.Advertisement, error)
+	CreateAdvertisements(adsData []*oa.AdvertisementData, identityKey, advertisableURI string) (overlay.TaggedBEEF, error)
+}
 
 // WalletAdvertiser implements the Advertiser interface for creating and managing
 // overlay advertisements using a BSV wallet. It supports both SHIP and SLAP protocols
@@ -54,6 +60,14 @@ type WalletAdvertiser struct {
 	skipStorageValidation bool
 	// testMode enables test mode with mock data instead of real HTTP requests
 	testMode bool
+	// authFetch provides authenticated HTTP requests for storage communication
+	authFetch *authhttp.AuthFetch
+	// wallet provides the wallet interface for authentication
+	wallet wallet.Interface
+	// identityKey is the hex-encoded identity key derived from the private key
+	identityKey string
+	// Finder allows mocking
+	Finder Finder
 }
 
 // Compile-time verification that WalletAdvertiser implements oa.Advertiser
@@ -90,6 +104,58 @@ func NewWalletAdvertiser(chain, privateKey, storageURL, advertisableURI string, 
 		return nil, fmt.Errorf("storageURL must be a valid HTTP or HTTPS URL: %s", storageURL)
 	}
 
+	// Create private key object for wallet initialization
+	privKey, err := ec.PrivateKeyFromHex(privateKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create private key object: %w", err)
+	}
+
+	// Initialize the wallet configuration
+	cfg := infra.Defaults()
+	cfg.ServerPrivateKey = privateKey
+	activeServices := services.New(slog.Default(), cfg.Services)
+
+	// Create storage manager for the wallet
+	storageManager, err := storage.NewGORMProvider(context.TODO(), slog.Default(), storage.GORMProviderConfig{
+		DB:                    cfg.DBConfig,
+		Chain:                 cfg.BSVNetwork,
+		FeeModel:              cfg.FeeModel,
+		Commission:            cfg.Commission,
+		Services:              activeServices,
+		SynchronizeTxStatuses: cfg.SynchronizeTxStatuses,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create storage manager: %w", err)
+	}
+
+	// Get storage identity key
+	storageIdentityKey, err := wdk.IdentityKey(cfg.ServerPrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create storage identity key: %w", err)
+	}
+
+	// Migrate storage
+	if _, err := storageManager.Migrate(context.TODO(), "wallet-advertiser", storageIdentityKey); err != nil {
+		return nil, fmt.Errorf("failed to migrate storage: %w", err)
+	}
+
+	// Determine the network based on chain parameter
+	var network defs.BSVNetwork
+	if chain == "test" {
+		network = defs.NetworkTestnet
+	} else {
+		network = defs.NetworkMainnet
+	}
+
+	// Create wallet
+	wlt, err := toolboxWallet.New(network, privKey, storageManager)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create wallet: %w", err)
+	}
+
+	// Create AuthFetch client
+	authClient := authhttp.New(wlt, nil, nil)
+
 	return &WalletAdvertiser{
 		chain:                chain,
 		privateKey:           privateKey,
@@ -97,6 +163,8 @@ func NewWalletAdvertiser(chain, privateKey, storageURL, advertisableURI string, 
 		advertisableURI:      advertisableURI,
 		lookupResolverConfig: lookupResolverConfig,
 		initialized:          false,
+		authFetch:            authClient,
+		wallet:               wlt,
 	}, nil
 }
 
@@ -136,6 +204,13 @@ func (w *WalletAdvertiser) Init() error {
 		return fmt.Errorf("cryptographic context setup failed: %w", err)
 	}
 
+	// Derive and set the identity key
+	identityKey, err := w.deriveIdentityKey()
+	if err != nil {
+		return fmt.Errorf("identity key derivation failed: %w", err)
+	}
+	w.identityKey = identityKey
+
 	w.initialized = true
 	return nil
 }
@@ -152,13 +227,20 @@ func (w *WalletAdvertiser) CreateAdvertisements(adsData []*oa.AdvertisementData)
 	}
 
 	// Validate all advertisement data entries
-	var topics []string
 	for i, adData := range adsData {
 		if err := w.validateAdvertisementData(adData); err != nil {
 			return overlay.TaggedBEEF{}, fmt.Errorf("invalid advertisement data at index %d: %w", i, err)
 		}
+	}
 
-		// Collect topics for the TaggedBEEF
+	// Use Finder for testing if available
+	if w.Finder != nil {
+		return w.Finder.CreateAdvertisements(adsData, w.identityKey, w.advertisableURI)
+	}
+
+	// Collect topics for the TaggedBEEF
+	var topics []string
+	for _, adData := range adsData {
 		if adData.Protocol == overlay.ProtocolSHIP {
 			topics = append(topics, "tm_"+adData.TopicOrServiceName)
 		} else if adData.Protocol == overlay.ProtocolSLAP {
@@ -271,7 +353,7 @@ func (w *WalletAdvertiser) CreateAdvertisements(adsData []*oa.AdvertisementData)
 }
 
 // FindAllAdvertisements finds all advertisements for a given protocol.
-// This method queries the storage to retrieve existing advertisements.
+// This method queries the overlay network using LookupResolver to retrieve existing advertisements.
 func (w *WalletAdvertiser) FindAllAdvertisements(protocol overlay.Protocol) ([]*oa.Advertisement, error) {
 	if !w.initialized {
 		return nil, fmt.Errorf("WalletAdvertiser must be initialized before finding advertisements")
@@ -282,10 +364,15 @@ func (w *WalletAdvertiser) FindAllAdvertisements(protocol overlay.Protocol) ([]*
 		return nil, fmt.Errorf("unsupported protocol: %s (must be 'SHIP' or 'SLAP')", protocol)
 	}
 
+	// Support custom Finder for testing
+	if w.Finder != nil {
+		return w.Finder.Advertisements(protocol)
+	}
+
 	// Query the storage for advertisements matching the protocol
-	advertisements, err := w.queryStorageForNewAdvertisements(protocol)
+	advertisements, err := w.queryStorageForAdvertisements(protocol)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query storage for %s advertisements: %w", protocol, err)
+		return nil, fmt.Errorf("failed to marshal query data: %w", err)
 	}
 
 	return advertisements, nil
@@ -569,24 +656,27 @@ func (w *WalletAdvertiser) setupCryptographicContexts() error {
 	return nil
 }
 
-// deriveIdentityKey derives an identity key from the private key (simplified implementation)
+// deriveIdentityKey derives an identity key from the private key
 func (w *WalletAdvertiser) deriveIdentityKey() (string, error) {
-	// In a real implementation, this would use proper key derivation
-	// For now, we'll create a deterministic identity key based on the private key
-	privateKeyBytes, err := hex.DecodeString(w.privateKey)
+	// Create private key from hex
+	privateKey, err := ec.PrivateKeyFromHex(w.privateKey)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to create private key: %w", err)
 	}
 
-	// Simple transformation to create identity key (not cryptographically secure)
-	// In production, this should use proper elliptic curve operations
-	identityKeyBytes := make([]byte, 33) // 33 bytes for compressed public key
-	identityKeyBytes[0] = 0x02           // Compressed public key prefix
+	// Derive the public key (identity key)
+	publicKey := privateKey.PubKey()
 
-	// Use first 32 bytes of private key as basis (this is NOT proper key derivation)
-	copy(identityKeyBytes[1:], privateKeyBytes)
+	// Return compressed public key as hex string
+	return hex.EncodeToString(publicKey.Compressed()), nil
+}
 
-	return hex.EncodeToString(identityKeyBytes), nil
+// getOverlayNetwork returns the overlay network based on the chain configuration
+func (w *WalletAdvertiser) getOverlayNetwork() overlay.Network {
+	if w.chain == "test" {
+		return overlay.NetworkTestnet
+	}
+	return overlay.NetworkMainnet
 }
 
 // extractDomainFromURI extracts the domain from the advertisable URI
@@ -739,148 +829,96 @@ func (w *WalletAdvertiser) encodeUint64(value uint64) []byte {
 }
 
 // queryStorageForAdvertisements queries the storage service for advertisements of a specific protocol
-func (w *WalletAdvertiser) queryStorageForAdvertisements(protocol string) ([]oa.Advertisement, error) {
-	// Return mock data in test mode
-	if w.testMode {
-		return w.getMockAdvertisements(protocol), nil
-	}
-
-	// Create HTTP client with timeout
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-	}
-
-	// Construct the query URL based on the storage service API
-	// This assumes a RESTful API pattern - actual implementation may vary
-	queryURL, err := url.Parse(w.storageURL)
-	if err != nil {
-		return nil, fmt.Errorf("invalid storage URL: %w", err)
-	}
-
-	// Add query parameters for protocol filtering
-	queryURL.Path = "/advertisements"
-	queryParams := queryURL.Query()
-	queryParams.Set("protocol", protocol)
-	queryParams.Set("limit", "1000") // Reasonable default limit
-	queryURL.RawQuery = queryParams.Encode()
-
-	// Make the HTTP request
-	resp, err := client.Get(queryURL.String())
-	if err != nil {
-		return nil, fmt.Errorf("failed to query storage service: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Check response status
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("storage service returned error %d: %s", resp.StatusCode, string(body))
-	}
-
-	// Read and parse the response
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
-	}
-
-	// Parse the JSON response
-	var storageResponse struct {
-		Advertisements []StorageAdvertisement `json:"advertisements"`
-		Total          int                    `json:"total"`
-		Error          string                 `json:"error,omitempty"`
-	}
-
-	if err := json.Unmarshal(body, &storageResponse); err != nil {
-		return nil, fmt.Errorf("failed to parse storage response: %w", err)
-	}
-
-	if storageResponse.Error != "" {
-		return nil, fmt.Errorf("storage service error: %s", storageResponse.Error)
-	}
-
-	// Convert storage format to our Advertisement format
-	var advertisements []oa.Advertisement
-	for _, storageAd := range storageResponse.Advertisements {
-		ad, err := w.convertStorageToAdvertisement(storageAd)
-		if err != nil {
-			// Log the error but continue processing other advertisements
-			continue
+func (w *WalletAdvertiser) queryStorageForAdvertisements(protocol overlay.Protocol) ([]*oa.Advertisement, error) {
+	// Create LookupResolver based on configuration
+	var resolver *lookup.LookupResolver
+	if w.lookupResolverConfig != nil {
+		// Convert our config to LookupResolver config
+		resolverConfig := &lookup.LookupResolver{
+			NetworkPreset: w.getOverlayNetwork(),
 		}
-		advertisements = append(advertisements, ad)
+		// Add any additional configuration from lookupResolverConfig if needed
+		resolver = lookup.NewLookupResolver(resolverConfig)
+	} else {
+		// Use default network preset based on chain
+		resolverConfig := &lookup.LookupResolver{
+			NetworkPreset: w.getOverlayNetwork(),
+		}
+		resolver = lookup.NewLookupResolver(resolverConfig)
 	}
 
-	return advertisements, nil
-}
-
-// queryStorageForNewAdvertisements queries the storage service for advertisements of a specific protocol (new types)
-func (w *WalletAdvertiser) queryStorageForNewAdvertisements(protocol overlay.Protocol) ([]*oa.Advertisement, error) {
-	// Return mock data in test mode
-	if w.testMode {
-		return w.getNewMockAdvertisements(protocol), nil
+	// Determine the service name based on protocol
+	var serviceName string
+	if protocol == overlay.ProtocolSHIP {
+		serviceName = "ls_ship"
+	} else {
+		serviceName = "ls_slap"
 	}
 
-	// Create HTTP client with timeout
-	client := &http.Client{
-		Timeout: 30 * time.Second,
+	// Create lookup question with proper JSON encoding
+	queryData := map[string]interface{}{
+		"identityKey": w.identityKey,
 	}
-
-	// Construct the query URL based on the storage service API
-	// This assumes a RESTful API pattern - actual implementation may vary
-	queryURL, err := url.Parse(w.storageURL)
+	queryJSON, err := json.Marshal(queryData)
 	if err != nil {
-		return nil, fmt.Errorf("invalid storage URL: %w", err)
+		return nil, fmt.Errorf("failed to marshal query data: %w", err)
 	}
 
-	// Add query parameters for protocol filtering
-	queryURL.Path = "/advertisements"
-	queryParams := queryURL.Query()
-	queryParams.Set("protocol", string(protocol))
-	queryParams.Set("limit", "1000") // Reasonable default limit
-	queryURL.RawQuery = queryParams.Encode()
+	question := &lookup.LookupQuestion{
+		Service: serviceName,
+		Query:   json.RawMessage(queryJSON),
+	}
 
-	// Make the HTTP request
-	resp, err := client.Get(queryURL.String())
+	// Create context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Execute the lookup query
+	lookupAnswer, err := resolver.Query(ctx, question)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query storage service: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Check response status
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("storage service returned error %d: %s", resp.StatusCode, string(body))
+		// Log warning but return empty array, matching TypeScript behavior
+		fmt.Printf("Warning: Error finding %s advertisements: %v\n", protocol, err)
+		return []*oa.Advertisement{}, nil
 	}
 
-	// Read and parse the response
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
-	}
-
-	// Parse the JSON response
-	var storageResponse struct {
-		Advertisements []StorageAdvertisement `json:"advertisements"`
-		Total          int                    `json:"total"`
-		Error          string                 `json:"error,omitempty"`
-	}
-
-	if err := json.Unmarshal(body, &storageResponse); err != nil {
-		return nil, fmt.Errorf("failed to parse storage response: %w", err)
-	}
-
-	if storageResponse.Error != "" {
-		return nil, fmt.Errorf("storage service error: %s", storageResponse.Error)
-	}
-
-	// Convert storage format to our Advertisement format
+	// Process the lookup answer
 	var advertisements []*oa.Advertisement
-	for _, storageAd := range storageResponse.Advertisements {
-		ad, err := w.convertStorageToNewAdvertisement(storageAd)
-		if err != nil {
-			// Log the error but continue processing other advertisements
-			continue
+
+	// Lookup will currently always return type output-list
+	if lookupAnswer.Type == "output-list" {
+		for _, output := range lookupAnswer.Outputs {
+			// Parse out the advertisements using the provided parser
+			tx, err := transaction.NewTransactionFromBEEF(output.Beef)
+			if err != nil {
+				fmt.Printf("Error: Failed to parse transaction from BEEF: %v\n", err)
+				continue
+			}
+
+			// Get the output at the specified index
+			if int(output.OutputIndex) >= len(tx.Outputs) {
+				fmt.Printf("Error: Output index %d out of range for transaction with %d outputs\n", output.OutputIndex, len(tx.Outputs))
+				continue
+			}
+
+			txOutput := tx.Outputs[output.OutputIndex]
+			lockingScript := txOutput.LockingScript
+
+			// Parse the advertisement from the locking script
+			advertisement, err := w.ParseAdvertisement(lockingScript)
+			if err != nil {
+				fmt.Printf("Error: Failed to parse advertisement output: %v\n", err)
+				continue
+			}
+
+			// Check if the advertisement matches the requested protocol
+			if advertisement != nil && advertisement.Protocol == protocol {
+				fmt.Printf("Found current advertisement of %s at %s\n", advertisement.TopicOrService, advertisement.Domain)
+				// Add BEEF and output index from the lookup result
+				advertisement.Beef = output.Beef
+				advertisement.OutputIndex = output.OutputIndex
+				advertisements = append(advertisements, advertisement)
+			}
 		}
-		advertisements = append(advertisements, ad)
 	}
 
 	return advertisements, nil
@@ -1221,28 +1259,6 @@ func (w *WalletAdvertiser) createSimpleLockingScript() []byte {
 	script = append(script, 0x88, 0xac) // OP_EQUALVERIFY OP_CHECKSIG
 
 	return script
-}
-
-// getMockAdvertisements returns mock advertisement data for testing
-func (w *WalletAdvertiser) getMockAdvertisements(protocol string) []oa.Advertisement {
-	var prot overlay.Protocol
-	if protocol == "SHIP" {
-		prot = overlay.ProtocolSHIP
-	} else {
-		prot = overlay.ProtocolSLAP
-	}
-
-	// Return sample advertisement data
-	return []oa.Advertisement{
-		{
-			Protocol:       prot,
-			IdentityKey:    "02abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
-			Domain:         "example.com",
-			TopicOrService: "test_service",
-			Beef:           []byte("mock-beef-data"),
-			OutputIndex:    1,
-		},
-	}
 }
 
 // getNewMockAdvertisements returns mock advertisement data for testing (new types)

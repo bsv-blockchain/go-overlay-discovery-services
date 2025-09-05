@@ -5,11 +5,15 @@ package slap
 import (
 	"context"
 	"fmt"
+	"log"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/utils"
 	"github.com/bsv-blockchain/go-sdk/overlay"
 	"github.com/bsv-blockchain/go-sdk/transaction"
+	"github.com/bsv-blockchain/go-sdk/transaction/template/pushdrop"
 )
 
 // ServiceSubscription represents an active service subscription for SLAP protocol
@@ -358,10 +362,95 @@ func (tm *TopicManager) GetAvailableServices() []string {
 // IdentifyAdmissibleOutputs implements the engine.TopicManager interface
 // For SLAP, this identifies outputs that should be admitted to the overlay
 func (tm *TopicManager) IdentifyAdmissibleOutputs(ctx context.Context, beef []byte, previousCoins map[uint32]*transaction.TransactionOutput) (overlay.AdmittanceInstructions, error) {
-	// SLAP topic manager doesn't admit outputs directly - it manages service lookup
-	// Return empty admissible list
+	outputsToAdmit := []uint32{}
+
+	// Parse transaction from BEEF format
+	parsedTransaction, err := transaction.NewTransactionFromBEEF(beef)
+	if err != nil {
+		// Only log error if no outputs were admitted and no previous coins consumed
+		if len(outputsToAdmit) == 0 && len(previousCoins) == 0 {
+			log.Printf("🤚 Error identifying admissible outputs: %v", err)
+		}
+		return overlay.AdmittanceInstructions{
+			OutputsToAdmit: outputsToAdmit,
+			CoinsToRetain:  []uint32{},
+		}, nil
+	}
+
+	// Check each output for SLAP token validity
+	for i, output := range parsedTransaction.Outputs {
+		// Decode PushDrop token
+		result := pushdrop.Decode(output.LockingScript)
+		if result == nil {
+			continue // It's common for other outputs to be invalid; no need to log an error here
+		}
+
+		// SLAP tokens must have exactly 5 fields
+		if len(result.Fields) != 5 {
+			continue
+		}
+
+		// Check SLAP identifier (first field)
+		slapIdentifier := utils.UTFBytesToString(result.Fields[0])
+		if slapIdentifier != "SLAP" {
+			continue
+		}
+
+		// Check advertised URI (third field)
+		advertisedURI := utils.UTFBytesToString(result.Fields[2])
+		if !utils.IsAdvertisableURI(advertisedURI) {
+			continue
+		}
+
+		// Check topic name (fourth field)
+		topic := utils.UTFBytesToString(result.Fields[3])
+		if !utils.IsValidTopicOrServiceName(topic) {
+			continue
+		}
+
+		// SLAP only accepts "ls_" (lookup service) advertisements
+		if !strings.HasPrefix(topic, "ls_") {
+			continue
+		}
+
+		// Check token signature linkage
+		lockingPublicKey := result.LockingPublicKey.ToDERHex()
+		tokenFields := make(utils.TokenFields, len(result.Fields))
+		for j, field := range result.Fields {
+			tokenFields[j] = field
+		}
+
+		// For now, use mock wallet - in production this should be the real wallet
+		mockWallet := &utils.MockWallet{}
+		if valid, err := utils.IsTokenSignatureCorrectlyLinked(lockingPublicKey, tokenFields, mockWallet); err == nil && valid {
+			outputsToAdmit = append(outputsToAdmit, uint32(i))
+		}
+	}
+
+	// Friendly logging with slappy emojis
+	if len(outputsToAdmit) > 0 {
+		if len(outputsToAdmit) == 1 {
+			log.Printf("👏 Admitted %d SLAP output!", len(outputsToAdmit))
+		} else {
+			log.Printf("👏 Admitted %d SLAP outputs!", len(outputsToAdmit))
+		}
+	}
+
+	if len(previousCoins) > 0 {
+		if len(previousCoins) == 1 {
+			log.Printf("✋ Consumed %d previous SLAP coin!", len(previousCoins))
+		} else {
+			log.Printf("✋ Consumed %d previous SLAP coins!", len(previousCoins))
+		}
+	}
+
+	if len(outputsToAdmit) == 0 && len(previousCoins) == 0 {
+		log.Printf("😕 No SLAP outputs admitted and no previous SLAP coins consumed.")
+	}
+
 	return overlay.AdmittanceInstructions{
-		OutputsToAdmit: []uint32{},
+		OutputsToAdmit: outputsToAdmit,
+		CoinsToRetain:  []uint32{},
 	}, nil
 }
 
