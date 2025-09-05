@@ -877,7 +877,7 @@ func (w *WalletAdvertiser) queryStorageForAdvertisements(protocol overlay.Protoc
 	lookupAnswer, err := resolver.Query(ctx, question)
 	if err != nil {
 		// Log warning but return empty array, matching TypeScript behavior
-		fmt.Printf("Warning: Error finding %s advertisements: %v\n", protocol, err)
+		slog.Warn("Error finding advertisements", "protocol", protocol, "error", err)
 		return []*oa.Advertisement{}, nil
 	}
 
@@ -890,13 +890,14 @@ func (w *WalletAdvertiser) queryStorageForAdvertisements(protocol overlay.Protoc
 			// Parse out the advertisements using the provided parser
 			tx, err := transaction.NewTransactionFromBEEF(output.Beef)
 			if err != nil {
-				fmt.Printf("Error: Failed to parse transaction from BEEF: %v\n", err)
+				slog.Error("Failed to parse transaction from BEEF", "error", err)
 				continue
 			}
 
 			// Get the output at the specified index
 			if int(output.OutputIndex) >= len(tx.Outputs) {
-				fmt.Printf("Error: Output index %d out of range for transaction with %d outputs\n", output.OutputIndex, len(tx.Outputs))
+				slog.Error("Output index out of range for transaction with outputs", "index", output.OutputIndex,
+					"output_count", len(tx.Outputs))
 				continue
 			}
 
@@ -906,13 +907,14 @@ func (w *WalletAdvertiser) queryStorageForAdvertisements(protocol overlay.Protoc
 			// Parse the advertisement from the locking script
 			advertisement, err := w.ParseAdvertisement(lockingScript)
 			if err != nil {
-				fmt.Printf("Error: Failed to parse advertisement output: %v\n", err)
+				slog.Error("Failed to parse advertisement output", "error", err)
 				continue
 			}
 
 			// Check if the advertisement matches the requested protocol
 			if advertisement != nil && advertisement.Protocol == protocol {
-				fmt.Printf("Found current advertisement of %s at %s\n", advertisement.TopicOrService, advertisement.Domain)
+				slog.Info("Found current advertisement", "TopicOrService", advertisement.TopicOrService,
+					"Domain", advertisement.Domain)
 				// Add BEEF and output index from the lookup result
 				advertisement.Beef = output.Beef
 				advertisement.OutputIndex = output.OutputIndex
@@ -1259,18 +1261,4 @@ func (w *WalletAdvertiser) createSimpleLockingScript() []byte {
 	script = append(script, 0x88, 0xac) // OP_EQUALVERIFY OP_CHECKSIG
 
 	return script
-}
-
-// getNewMockAdvertisements returns mock advertisement data for testing (new types)
-func (w *WalletAdvertiser) getNewMockAdvertisements(protocol overlay.Protocol) []*oa.Advertisement {
-	return []*oa.Advertisement{
-		{
-			Protocol:       protocol,
-			IdentityKey:    "02abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
-			Domain:         "example.com",
-			TopicOrService: "test_service",
-			Beef:           []byte("mock-beef-data"),
-			OutputIndex:    1,
-		},
-	}
 }
