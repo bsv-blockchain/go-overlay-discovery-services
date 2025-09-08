@@ -6,6 +6,7 @@ package utils
 import (
 	"net/url"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -84,7 +85,7 @@ func validateCustomHTTPSURI(uri, prefix string) bool {
 	}
 
 	// Path must be root path only
-	if parsedURL.Path != "/" {
+	if !slices.Contains([]string{"/", ""}, parsedURL.Path) {
 		return false
 	}
 

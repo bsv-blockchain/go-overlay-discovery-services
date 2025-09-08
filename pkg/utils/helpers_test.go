@@ -1,31 +1,8 @@
 package utils
 
 import (
-	"errors"
 	"testing"
 )
-
-// TestWallet provides a test implementation of WalletInterface
-type TestWallet struct {
-	ShouldVerifyPass bool
-	VerifyError      error
-	ExpectedPubKey   string
-	PubKeyError      error
-}
-
-func (w *TestWallet) VerifySignature(req SignatureVerificationRequest) SignatureVerificationResult {
-	if w.VerifyError != nil {
-		return SignatureVerificationResult{Valid: false, Error: w.VerifyError}
-	}
-	return SignatureVerificationResult{Valid: w.ShouldVerifyPass, Error: nil}
-}
-
-func (w *TestWallet) GetPublicKey(req PublicKeyRequest) PublicKeyResult {
-	if w.PubKeyError != nil {
-		return PublicKeyResult{PublicKey: "", Error: w.PubKeyError}
-	}
-	return PublicKeyResult{PublicKey: w.ExpectedPubKey, Error: nil}
-}
 
 func TestIsTokenSignatureCorrectlyLinked(t *testing.T) {
 	// Test data setup
@@ -46,19 +23,14 @@ func TestIsTokenSignatureCorrectlyLinked(t *testing.T) {
 		name           string
 		lockingPubKey  string
 		fields         TokenFields
-		wallet         WalletInterface
 		expectedResult bool
 		expectedError  bool
 		errorSubstring string
 	}{
 		{
-			name:          "valid SHIP token",
-			lockingPubKey: validLockingPubKey,
-			fields:        validFields,
-			wallet: &TestWallet{
-				ShouldVerifyPass: true,
-				ExpectedPubKey:   validLockingPubKey,
-			},
+			name:           "valid SHIP token",
+			lockingPubKey:  validLockingPubKey,
+			fields:         validFields,
 			expectedResult: true,
 			expectedError:  false,
 		},
@@ -71,10 +43,6 @@ func TestIsTokenSignatureCorrectlyLinked(t *testing.T) {
 				extraData,
 				signature,
 			},
-			wallet: &TestWallet{
-				ShouldVerifyPass: true,
-				ExpectedPubKey:   validLockingPubKey,
-			},
 			expectedResult: true,
 			expectedError:  false,
 		},
@@ -85,7 +53,6 @@ func TestIsTokenSignatureCorrectlyLinked(t *testing.T) {
 				protocol,
 				identityKey,
 			},
-			wallet:         &TestWallet{},
 			expectedResult: false,
 			expectedError:  true,
 			errorSubstring: "insufficient fields",
@@ -99,7 +66,6 @@ func TestIsTokenSignatureCorrectlyLinked(t *testing.T) {
 				extraData,
 				signature,
 			},
-			wallet:         &TestWallet{},
 			expectedResult: false,
 			expectedError:  true,
 			errorSubstring: "unknown protocol",
@@ -111,53 +77,37 @@ func TestIsTokenSignatureCorrectlyLinked(t *testing.T) {
 				protocol,
 				signature,
 			},
-			wallet:         &TestWallet{},
 			expectedResult: false,
 			expectedError:  true,
 			errorSubstring: "insufficient fields",
 		},
 		{
-			name:          "signature verification error",
-			lockingPubKey: validLockingPubKey,
-			fields:        validFields,
-			wallet: &TestWallet{
-				VerifyError: errors.New("crypto error"),
-			},
+			name:           "signature verification error",
+			lockingPubKey:  validLockingPubKey,
+			fields:         validFields,
 			expectedResult: false,
 			expectedError:  true,
 			errorSubstring: "signature verification failed",
 		},
 		{
-			name:          "invalid signature",
-			lockingPubKey: validLockingPubKey,
-			fields:        validFields,
-			wallet: &TestWallet{
-				ShouldVerifyPass: false,
-				ExpectedPubKey:   validLockingPubKey,
-			},
+			name:           "invalid signature",
+			lockingPubKey:  validLockingPubKey,
+			fields:         validFields,
 			expectedResult: false,
 			expectedError:  false,
 		},
 		{
-			name:          "public key derivation error",
-			lockingPubKey: validLockingPubKey,
-			fields:        validFields,
-			wallet: &TestWallet{
-				ShouldVerifyPass: true,
-				PubKeyError:      errors.New("derivation error"),
-			},
+			name:           "public key derivation error",
+			lockingPubKey:  validLockingPubKey,
+			fields:         validFields,
 			expectedResult: false,
 			expectedError:  true,
 			errorSubstring: "failed to get expected public key",
 		},
 		{
-			name:          "public key mismatch",
-			lockingPubKey: validLockingPubKey,
-			fields:        validFields,
-			wallet: &TestWallet{
-				ShouldVerifyPass: true,
-				ExpectedPubKey:   "different_key",
-			},
+			name:           "public key mismatch",
+			lockingPubKey:  validLockingPubKey,
+			fields:         validFields,
 			expectedResult: false,
 			expectedError:  false,
 		},
@@ -165,7 +115,7 @@ func TestIsTokenSignatureCorrectlyLinked(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := IsTokenSignatureCorrectlyLinked(tt.lockingPubKey, tt.fields, tt.wallet)
+			result, err := IsTokenSignatureCorrectlyLinked(t.Context(), tt.lockingPubKey, tt.fields)
 
 			if tt.expectedError {
 				if err == nil {
@@ -302,48 +252,6 @@ func TestHexToBytes(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-func TestMockWallet(t *testing.T) {
-	wallet := &MockWallet{}
-
-	// Test VerifySignature
-	verifyResult := wallet.VerifySignature(SignatureVerificationRequest{})
-	if verifyResult.Valid {
-		t.Error("MockWallet should return invalid signature")
-	}
-	if verifyResult.Error == nil {
-		t.Error("MockWallet should return an error for signature verification")
-	}
-
-	// Test GetPublicKey
-	pubKeyResult := wallet.GetPublicKey(PublicKeyRequest{})
-	if pubKeyResult.PublicKey != "" {
-		t.Error("MockWallet should return empty public key")
-	}
-	if pubKeyResult.Error == nil {
-		t.Error("MockWallet should return an error for public key derivation")
-	}
-}
-
-func TestProtocolIDCreation(t *testing.T) {
-	// Test SHIP protocol
-	shipProtocol := ProtocolID{Type: 2, Description: "service host interconnect"}
-	if shipProtocol.Type != 2 {
-		t.Errorf("Expected Type 2, got %d", shipProtocol.Type)
-	}
-	if shipProtocol.Description != "service host interconnect" {
-		t.Errorf("Expected 'service host interconnect', got %q", shipProtocol.Description)
-	}
-
-	// Test SLAP protocol
-	slapProtocol := ProtocolID{Type: 2, Description: "service lookup availability"}
-	if slapProtocol.Type != 2 {
-		t.Errorf("Expected Type 2, got %d", slapProtocol.Type)
-	}
-	if slapProtocol.Description != "service lookup availability" {
-		t.Errorf("Expected 'service lookup availability', got %q", slapProtocol.Description)
 	}
 }
 

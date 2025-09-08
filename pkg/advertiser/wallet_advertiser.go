@@ -291,12 +291,7 @@ func (w *WalletAdvertiser) CreateAdvertisements(adsData []*oa.AdvertisementData)
 			return overlay.TaggedBEEF{}, fmt.Errorf("invalid topic or service name: %s", ad.TopicOrServiceName)
 		}
 		var protocol = wallet.Protocol{SecurityLevel: wallet.SecurityLevelEveryAppAndCounterparty}
-		// ad.protocol === 'SHIP' ? 'service host interconnect' : 'service lookup availability'
-		if ad.Protocol == overlay.ProtocolSHIP {
-			protocol.Protocol = "service host interconnect"
-		} else if ad.Protocol == overlay.ProtocolSLAP {
-			protocol.Protocol = "service lookup availability"
-		} else {
+		if protocol.Protocol = string(ad.Protocol.ID()); protocol.Protocol == "" {
 			return overlay.TaggedBEEF{}, fmt.Errorf("unsupported protocol: %s (must be 'SHIP' or 'SLAP')", ad.Protocol)
 		}
 		lockingScript, err := pd.Lock(

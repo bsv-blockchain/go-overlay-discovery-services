@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 
@@ -68,11 +69,6 @@ func main() {
 		fmt.Printf("  Hex to Bytes: %s -> %v\n", hexString, backToBytes)
 	}
 
-	// UTF-8 conversion
-	utf8Bytes := []byte("Hello, 世界!")
-	utf8String := utils.UTFBytesToString(utf8Bytes)
-	fmt.Printf("  UTF-8 Bytes to String: %v -> %s\n", utf8Bytes, utf8String)
-
 	// Example 4: Token signature validation (with mock wallet)
 	fmt.Println("\n4. Token Signature Validation Example (Mock):")
 
@@ -90,9 +86,8 @@ func main() {
 	}
 
 	lockingPubKey := "03abc123def456"
-	mockWallet := &utils.MockWallet{}
 
-	isValid, err := utils.IsTokenSignatureCorrectlyLinked(lockingPubKey, tokenFields, mockWallet)
+	isValid, err := utils.IsTokenSignatureCorrectlyLinked(context.TODO(), lockingPubKey, tokenFields)
 	if err != nil {
 		fmt.Printf("  Token validation error (expected with mock wallet): %v\n", err)
 	} else {

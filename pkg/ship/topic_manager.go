@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -346,10 +347,10 @@ func (tm *TopicManager) IdentifyAdmissibleOutputs(ctx context.Context, beef []by
 			tokenFields[j] = field
 		}
 
-		// For now, use mock wallet - in production this should be the real wallet
-		mockWallet := &utils.MockWallet{}
-		if valid, err := utils.IsTokenSignatureCorrectlyLinked(lockingPublicKey, tokenFields, mockWallet); err == nil && valid {
+		if valid, err := utils.IsTokenSignatureCorrectlyLinked(ctx, lockingPublicKey, tokenFields); err == nil && valid {
 			outputsToAdmit = append(outputsToAdmit, uint32(i))
+		} else if err == nil && !valid {
+			slog.Info("Invalid token signature linkage", "outputIndex", i, "txid", parsedTransaction.TxID())
 		}
 	}
 
