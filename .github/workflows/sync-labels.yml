@@ -57,7 +57,7 @@ jobs:
       # 1. Checkout repository
       # ————————————————————————————————————————————————————————————————
       - name: 🚚 Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
       # ————————————————————————————————————————————————————————————————
       # 2. Validate and parse labels file
@@ -139,7 +139,7 @@ jobs:
       # 3. Sync labels using native GitHub API
       # ————————————————————————————————————————————————————————————————
       - name: 🏷️ Sync labels from manifest
-        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -350,7 +350,7 @@ jobs:
       # ————————————————————————————————————————————————————————————————
       - name: 🔍 Verify sync results
         if: github.event.inputs.dry_run != 'true'
-        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
