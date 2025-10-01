@@ -413,10 +413,10 @@ func createMockPushDropScript(adData *oa.AdvertisementData) *script.Script {
 
 	// Prepare the 5 required fields for SHIP/SLAP advertisements
 	fields := [][]byte{
-		[]byte(string(adData.Protocol)),                 // Protocol identifier
+		[]byte(string(adData.Protocol)), // Protocol identifier
 		[]byte{0x02, 0xfe, 0x8d, 0x1e, 0xb1, 0xbc, 0xb3, 0x43, 0x2b, 0x1d, 0xb5, 0x83, 0x3f, 0xf5, 0xf2, 0x22, 0x6d, 0x9c, 0xb5, 0xe6, 0x5c, 0xee, 0x43, 0x05, 0x58, 0xc1, 0x8e, 0xd3, 0xa3, 0xc8, 0x6c, 0xe1, 0xaf}, // Identity key (33 bytes)
-		[]byte("https://advertise-me.com"),              // Advertised URI
-		[]byte(adData.TopicOrServiceName),               // Topic
+		[]byte("https://advertise-me.com"),               // Advertised URI
+		[]byte(adData.TopicOrServiceName),                // Topic
 		[]byte{0x30, 0x44, 0x02, 0x20, 0x01, 0x02, 0x03}, // Mock signature (DER format)
 	}
 

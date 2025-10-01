@@ -36,3 +36,7 @@ coverage.out
 
 # Fuzz Tests
 testdata
+
+CLAUDE.md
+.claudeignore
+.claude
