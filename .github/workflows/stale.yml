@@ -74,7 +74,7 @@ jobs:
       # 2. Process issues for stale marking and closing
       # ————————————————————————————————————————————————————————————————
       - name: Process stale issues
-        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -204,7 +204,7 @@ jobs:
       # 3. Process pull-requests for stale marking and closing
       # ————————————————————————————————————————————————————————————————
       - name: Process stale pull requests
-        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -336,7 +336,7 @@ jobs:
       # 4. Clean up stale labels from recently updated items
       # ————————————————————————————————————————————————————————————————
       - name: Remove stale labels from updated items
-        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
