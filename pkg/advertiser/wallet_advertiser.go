@@ -154,7 +154,7 @@ func NewWalletAdvertiser(chain, privateKey, storageURL, advertisableURI string, 
 	}
 
 	// Create AuthFetch client
-	authClient := authhttp.New(wlt, nil, nil)
+	authClient := authhttp.New(wlt)
 
 	return &WalletAdvertiser{
 		chain:                chain,
