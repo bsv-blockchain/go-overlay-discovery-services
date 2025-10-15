@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"bytes"
 	"context"
 	"testing"
 
@@ -350,7 +351,7 @@ func TestFlattenFields(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := flattenFields(tt.fields)
-			if !bytesEqual(result, tt.expected) {
+			if !bytes.Equal(result, tt.expected) {
 				t.Errorf("flattenFields() = %v, expected %v", result, tt.expected)
 			}
 		})
@@ -429,37 +430,10 @@ func TestHexToBytes(t *testing.T) {
 				if err != nil {
 					t.Errorf("Unexpected error: %v", err)
 				}
-				if !bytesEqual(result, tt.expected) {
+				if !bytes.Equal(result, tt.expected) {
 					t.Errorf("HexToBytes(%q) = %v, expected %v", tt.hexStr, result, tt.expected)
 				}
 			}
 		})
 	}
-}
-
-// Helper functions for tests
-
-func containsSubstring(s, substr string) bool {
-	return len(s) >= len(substr) && findSubstring(s, substr) >= 0
-}
-
-func findSubstring(s, substr string) int {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return i
-		}
-	}
-	return -1
-}
-
-func bytesEqual(a, b []byte) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
 }
