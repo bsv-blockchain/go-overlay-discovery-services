@@ -129,11 +129,6 @@ func TestIsValidTopicOrServiceName(t *testing.T) {
 	}
 }
 
-// Helper function for the long string test
-func init() {
-	// This ensures strings package is available for the test
-}
-
 func TestValidateCustomHTTPSURI(t *testing.T) {
 	tests := []struct {
 		name     string
