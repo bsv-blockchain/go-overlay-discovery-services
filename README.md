@@ -13,28 +13,28 @@
   <tbody>
     <tr>
       <td valign="top" align="left">
-        <a href="https://github.com/bsv-blockchain/go-overlay-discovery-service/releases">
-          <img src="https://img.shields.io/github/release-pre/bsv-blockchain/go-overlay-discovery-service?logo=github&style=flat" alt="Latest Release">
+        <a href="https://github.com/bsv-blockchain/go-overlay-discovery-services/releases">
+          <img src="https://img.shields.io/github/release-pre/bsv-blockchain/go-overlay-discovery-services?logo=github&style=flat" alt="Latest Release">
         </a><br/>
-        <a href="https://github.com/bsv-blockchain/go-overlay-discovery-service/actions">
-          <img src="https://img.shields.io/github/actions/workflow/status/bsv-blockchain/go-overlay-discovery-service/fortress.yml?branch=master&logo=github&style=flat" alt="Build Status">
+        <a href="https://github.com/bsv-blockchain/go-overlay-discovery-services/actions">
+          <img src="https://img.shields.io/github/actions/workflow/status/bsv-blockchain/go-overlay-discovery-services/fortress.yml?branch=master&logo=github&style=flat" alt="Build Status">
         </a><br/>
-		<a href="https://github.com/bsv-blockchain/go-overlay-discovery-service/actions">
-          <img src="https://github.com/bsv-blockchain/go-overlay-discovery-service/actions/workflows/codeql-analysis.yml/badge.svg?style=flat" alt="CodeQL">
+		<a href="https://github.com/bsv-blockchain/go-overlay-discovery-services/actions">
+          <img src="https://github.com/bsv-blockchain/go-overlay-discovery-services/actions/workflows/codeql-analysis.yml/badge.svg?style=flat" alt="CodeQL">
         </a><br/>
-		<a href="https://sonarcloud.io/project/overview?id=bsv-blockchain_go-overlay-discovery-service">
-          <img src="https://sonarcloud.io/api/project_badges/measure?project=bsv-blockchain_go-overlay-discovery-service&metric=alert_status&style-flat" alt="SonarCloud">
+		<a href="https://sonarcloud.io/project/overview?id=bsv-blockchain_go-overlay-discovery-services">
+          <img src="https://sonarcloud.io/api/project_badges/measure?project=bsv-blockchain_go-overlay-discovery-services&metric=alert_status&style-flat" alt="SonarCloud">
         </a>
       </td>
       <td valign="top" align="left">
-        <a href="https://goreportcard.com/report/github.com/bsv-blockchain/go-overlay-discovery-service">
-          <img src="https://goreportcard.com/badge/github.com/bsv-blockchain/go-overlay-discovery-service?style=flat" alt="Go Report Card">
+        <a href="https://goreportcard.com/report/github.com/bsv-blockchain/go-overlay-discovery-services">
+          <img src="https://goreportcard.com/badge/github.com/bsv-blockchain/go-overlay-discovery-services?style=flat" alt="Go Report Card">
         </a><br/>
-		<a href="https://codecov.io/gh/bsv-blockchain/go-overlay-discovery-service/tree/master">
-          <img src="https://codecov.io/gh/bsv-blockchain/go-overlay-discovery-service/branch/master/graph/badge.svg?style=flat" alt="Code Coverage">
+		<a href="https://codecov.io/gh/bsv-blockchain/go-overlay-discovery-services/tree/master">
+          <img src="https://codecov.io/gh/bsv-blockchain/go-overlay-discovery-services/branch/master/graph/badge.svg?style=flat" alt="Code Coverage">
         </a><br/>
-		<a href="https://scorecard.dev/viewer/?uri=github.com/bsv-blockchain/go-overlay-discovery-service">
-          <img src="https://api.scorecard.dev/projects/github.com/bsv-blockchain/go-overlay-discovery-service/badge?logo=springsecurity&logoColor=white" alt="OpenSSF Scorecard">
+		<a href="https://scorecard.dev/viewer/?uri=github.com/bsv-blockchain/go-overlay-discovery-services">
+          <img src="https://api.scorecard.dev/projects/github.com/bsv-blockchain/go-overlay-discovery-services/badge?logo=springsecurity&logoColor=white" alt="OpenSSF Scorecard">
         </a><br/>
 		<a href=".github/SECURITY.md">
           <img src="https://img.shields.io/badge/security-policy-blue?style=flat&logo=springsecurity&logoColor=white" alt="Security policy">
@@ -42,10 +42,10 @@
       </td>
       <td valign="top" align="left">
         <a href="https://golang.org/">
-          <img src="https://img.shields.io/github/go-mod/go-version/bsv-blockchain/go-overlay-discovery-service?style=flat" alt="Go version">
+          <img src="https://img.shields.io/github/go-mod/go-version/bsv-blockchain/go-overlay-discovery-services?style=flat" alt="Go version">
         </a><br/>
-        <a href="https://pkg.go.dev/github.com/bsv-blockchain/go-overlay-discovery-service?tab=doc">
-          <img src="https://pkg.go.dev/badge/github.com/bsv-blockchain/go-overlay-discovery-service.svg?style=flat" alt="Go docs">
+        <a href="https://pkg.go.dev/github.com/bsv-blockchain/go-overlay-discovery-services?tab=doc">
+          <img src="https://pkg.go.dev/badge/github.com/bsv-blockchain/go-overlay-discovery-services.svg?style=flat" alt="Go docs">
         </a><br/>
         <a href=".github/AGENTS.md">
           <img src="https://img.shields.io/badge/AGENTS.md-found-40b814?style=flat&logo=openai" alt="AGENTS.md rules">
@@ -58,11 +58,11 @@
         </a>
       </td>
       <td valign="top" align="left">
-        <a href="https://github.com/bsv-blockchain/go-overlay-discovery-service/graphs/contributors">
-          <img src="https://img.shields.io/github/contributors/bsv-blockchain/go-overlay-discovery-service?style=flat&logo=contentful&logoColor=white" alt="Contributors">
+        <a href="https://github.com/bsv-blockchain/go-overlay-discovery-services/graphs/contributors">
+          <img src="https://img.shields.io/github/contributors/bsv-blockchain/go-overlay-discovery-services?style=flat&logo=contentful&logoColor=white" alt="Contributors">
         </a><br/>
-		<a href="https://github.com/bsv-blockchain/go-overlay-discovery-service/commits/master">
-		  <img src="https://img.shields.io/github/last-commit/bsv-blockchain/go-overlay-discovery-service?style=flat&logo=clockify&logoColor=white" alt="Last commit">
+		<a href="https://github.com/bsv-blockchain/go-overlay-discovery-services/commits/master">
+		  <img src="https://img.shields.io/github/last-commit/bsv-blockchain/go-overlay-discovery-services?style=flat&logo=clockify&logoColor=white" alt="Last commit">
 		</a><br/>
         <a href="https://github.com/sponsors/bsv-blockchain">
           <img src="https://img.shields.io/badge/sponsor-BSV-181717.svg?logo=github&style=flat" alt="Sponsor">
@@ -298,7 +298,7 @@ View the [contributing guidelines](.github/CONTRIBUTING.md) and please follow th
 All kinds of contributions are welcome :raised_hands:!
 The most basic way to show your support is to star :star2: the project, or to raise issues :speech_balloon:.
 
-[![Stars](https://img.shields.io/github/stars/bsv-blockchain/go-overlay-discovery-service?label=Please%20like%20us&style=social&v=1)](https://github.com/bsv-blockchain/go-overlay-discovery-service/stargazers)
+[![Stars](https://img.shields.io/github/stars/bsv-blockchain/go-overlay-discovery-services?label=Please%20like%20us&style=social&v=1)](https://github.com/bsv-blockchain/go-overlay-discovery-services/stargazers)
 
 <br/>
 
