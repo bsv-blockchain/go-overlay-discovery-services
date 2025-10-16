@@ -1,6 +1,6 @@
 # 🔐 Security Policy
 
-Security is a priority. We maintain a proactive stance to identify and fix vulnerabilities in **go-overlay-discovery-service**.
+Security is a priority. We maintain a proactive stance to identify and fix vulnerabilities in **go-overlay-discovery-services**.
 
 <br/>
 
@@ -73,4 +73,4 @@ To proactively protect this repository, we use several automated GitHub workflow
 - **[CodeQL Analysis](./workflows/codeql-analysis.yml)**: Scans the codebase for security vulnerabilities and coding errors using GitHub's CodeQL engine on every push and pull request to the `master` branch.
 - **[OpenSSF Scorecard](./workflows/scorecard.yml)**: Periodically evaluates the repository against OpenSSF Scorecard checks, providing insights and recommendations for improving supply chain security and best practices.
 
-These workflows help us identify, remediate, and prevent security issues as early as possible in the development lifecycle. For more details, see the workflow files in the [`.github/workflows/`](https://github.com/bsv-blockchain/go-overlay-discovery-service/tree/master/.github/workflows) directory.
+These workflows help us identify, remediate, and prevent security issues as early as possible in the development lifecycle. For more details, see the workflow files in the [`.github/workflows/`](https://github.com/bsv-blockchain/go-overlay-discovery-services/tree/master/.github/workflows) directory.
