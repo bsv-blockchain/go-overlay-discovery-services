@@ -16,6 +16,7 @@ go.list
 
 # OS files
 *.db
+*.sqlite
 *.DS_Store
 
 # Jetbrains
@@ -36,3 +37,7 @@ coverage.out
 
 # Fuzz Tests
 testdata
+
+CLAUDE.md
+.claudeignore
+.claude
