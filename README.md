@@ -21,9 +21,6 @@
         </a><br/>
 		<a href="https://github.com/bsv-blockchain/go-overlay-discovery-services/actions">
           <img src="https://github.com/bsv-blockchain/go-overlay-discovery-services/actions/workflows/codeql-analysis.yml/badge.svg?style=flat" alt="CodeQL">
-        </a><br/>
-		<a href="https://sonarcloud.io/project/overview?id=bsv-blockchain_go-overlay-discovery-services">
-          <img src="https://sonarcloud.io/api/project_badges/measure?project=bsv-blockchain_go-overlay-discovery-services&metric=alert_status&style-flat" alt="SonarCloud">
         </a>
       </td>
       <td valign="top" align="left">
