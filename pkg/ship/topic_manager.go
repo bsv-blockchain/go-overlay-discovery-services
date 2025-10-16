@@ -154,10 +154,11 @@ func (tm *TopicManager) HandleTopicMessage(ctx context.Context, message TopicMes
 	tm.mutex.RLock()
 	subscription, subscriptionExists := tm.subscriptions[message.Topic]
 	handler, handlerExists := tm.handlers[message.Topic]
+	isActive := subscriptionExists && subscription.IsActive
 	tm.mutex.RUnlock()
 
 	// Check if we have an active subscription for this topic
-	if !subscriptionExists || !subscription.IsActive {
+	if !subscriptionExists || !isActive {
 		// Silently ignore messages for topics we're not subscribed to
 		return nil
 	}

@@ -592,9 +592,10 @@ func TestConcurrentSubscription(t *testing.T) {
 func TestConcurrentMessageHandling(t *testing.T) {
 	topicManager := createTestSHIPTopicManager()
 
-	// Subscribe to topic
-	handlerCalled := false
-	handler := createMockHandler(&handlerCalled, false)
+	// Subscribe to topic with a thread-safe handler
+	handler := func(_ context.Context, _ TopicMessage) error {
+		return nil
+	}
 
 	err := topicManager.SubscribeToTopic(context.Background(), "tm_test", handler)
 	require.NoError(t, err)

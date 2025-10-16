@@ -727,9 +727,10 @@ func TestConcurrentServiceSubscription(t *testing.T) {
 func TestConcurrentServiceMessageHandling(t *testing.T) {
 	topicManager := createTestSLAPTopicManager()
 
-	// Subscribe to service
-	handlerCalled := false
-	handler := createMockServiceHandler(&handlerCalled, false)
+	// Subscribe to service with a thread-safe handler
+	handler := func(_ context.Context, _ ServiceMessage) error {
+		return nil
+	}
 
 	err := topicManager.SubscribeToService(context.Background(), "ls_treasury", "example.com", handler)
 	require.NoError(t, err)
