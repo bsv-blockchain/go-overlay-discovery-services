@@ -151,14 +151,14 @@ func NewWalletAdvertiser(chain, privateKey, storageURL, advertisableURI string, 
 	activeServices := services.New(slog.Default(), cfg.Services)
 
 	// Create storage manager for the wallet
-	storageManager, errStorage := storage.NewGORMProvider(context.TODO(), slog.Default(), storage.GORMProviderConfig{
-		DB:                    cfg.DBConfig,
-		Chain:                 cfg.BSVNetwork,
-		FeeModel:              cfg.FeeModel,
-		Commission:            cfg.Commission,
-		Services:              activeServices,
-		SynchronizeTxStatuses: cfg.SynchronizeTxStatuses,
-	})
+	storageManager, errStorage := storage.NewGORMProvider(
+		cfg.BSVNetwork,
+		activeServices,
+		storage.WithDBConfig(cfg.DBConfig),
+		storage.WithFeeModel(cfg.FeeModel),
+		storage.WithCommission(cfg.Commission),
+		storage.WithSynchronizeTxStatuses(cfg.SynchronizeTxStatuses),
+	)
 	if errStorage != nil {
 		return nil, fmt.Errorf("failed to create storage manager: %w", errStorage)
 	}
@@ -291,14 +291,14 @@ func (w *WalletAdvertiser) CreateAdvertisements(adsData []*oa.AdvertisementData)
 	cfg.ServerPrivateKey = w.privateKey
 	activeServices := services.New(logger, cfg.Services)
 
-	storageManager, errStorage := storage.NewGORMProvider(context.TODO(), logger, storage.GORMProviderConfig{
-		DB:                    cfg.DBConfig,
-		Chain:                 cfg.BSVNetwork,
-		FeeModel:              cfg.FeeModel,
-		Commission:            cfg.Commission,
-		Services:              activeServices,
-		SynchronizeTxStatuses: cfg.SynchronizeTxStatuses,
-	})
+	storageManager, errStorage := storage.NewGORMProvider(
+		cfg.BSVNetwork,
+		activeServices,
+		storage.WithDBConfig(cfg.DBConfig),
+		storage.WithFeeModel(cfg.FeeModel),
+		storage.WithCommission(cfg.Commission),
+		storage.WithSynchronizeTxStatuses(cfg.SynchronizeTxStatuses),
+	)
 	if errStorage != nil {
 		return overlay.TaggedBEEF{}, fmt.Errorf("failed to create storage provider: %w", errStorage)
 	}
