@@ -115,10 +115,10 @@ func TestOutputAdmittedByTopic_Success(t *testing.T) {
 
 	// Create valid PushDrop script with SLAP data
 	fields := [][]byte{
-		[]byte("SLAP"),                 // Protocol identifier
-		[]byte{0x01, 0x02, 0x03, 0x04}, // Identity key bytes
-		[]byte("https://example.com"),  // Domain
-		[]byte("ls_treasury"),          // Service
+		[]byte("SLAP"),                // Protocol identifier
+		{0x01, 0x02, 0x03, 0x04},      // Identity key bytes
+		[]byte("https://example.com"), // Domain
+		[]byte("ls_treasury"),         // Service
 	}
 	validScriptHex := createValidPushDropScript(fields)
 	scriptObj, err := script.NewFromHex(validScriptHex)
@@ -215,7 +215,7 @@ func TestOutputAdmittedByTopic_InsufficientFields(t *testing.T) {
 	// Create PushDrop script with only 2 fields instead of required 4
 	fields := [][]byte{
 		[]byte("SLAP"),
-		[]byte{0x01, 0x02, 0x03, 0x04},
+		{0x01, 0x02, 0x03, 0x04},
 	}
 	invalidScriptHex := createValidPushDropScript(fields)
 	scriptObj, err := script.NewFromHex(invalidScriptHex)
@@ -248,10 +248,10 @@ func TestOutputAdmittedByTopic_IgnoreNonSLAPProtocol(t *testing.T) {
 
 	// Create valid PushDrop script with SHIP protocol instead of SLAP
 	fields := [][]byte{
-		[]byte("SHIP"),                 // Different protocol
-		[]byte{0x01, 0x02, 0x03, 0x04}, // Identity key bytes
-		[]byte("https://example.com"),  // Domain
-		[]byte("ls_treasury"),          // Service
+		[]byte("SHIP"),                // Different protocol
+		{0x01, 0x02, 0x03, 0x04},      // Identity key bytes
+		[]byte("https://example.com"), // Domain
+		[]byte("ls_treasury"),         // Service
 	}
 	validScriptHex := createValidPushDropScript(fields)
 	scriptObj, err := script.NewFromHex(validScriptHex)
@@ -617,10 +617,10 @@ func TestOutputAdmittedByTopic_StorageError(t *testing.T) {
 
 	// Create valid PushDrop script with SLAP data
 	fields := [][]byte{
-		[]byte("SLAP"),                 // Protocol identifier
-		[]byte{0x01, 0x02, 0x03, 0x04}, // Identity key bytes
-		[]byte("https://example.com"),  // Domain
-		[]byte("ls_treasury"),          // Service
+		[]byte("SLAP"),                // Protocol identifier
+		{0x01, 0x02, 0x03, 0x04},      // Identity key bytes
+		[]byte("https://example.com"), // Domain
+		[]byte("ls_treasury"),         // Service
 	}
 	validScriptHex := createValidPushDropScript(fields)
 	scriptObj, err := script.NewFromHex(validScriptHex)
@@ -803,7 +803,7 @@ func TestOutputAdmittedByTopic_DifferentServices(t *testing.T) {
 			// Create valid PushDrop script with SLAP data
 			fields := [][]byte{
 				[]byte("SLAP"),
-				[]byte{0x01, 0x02, 0x03, 0x04},
+				{0x01, 0x02, 0x03, 0x04},
 				[]byte("https://example.com"),
 				[]byte(tc.serviceName),
 			}

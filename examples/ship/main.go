@@ -115,9 +115,9 @@ func createSampleSHIPScript() (*script.Script, error) {
 	// Add SHIP advertisement fields using PushDrop format
 	fields := [][]byte{
 		[]byte("SHIP"), // Protocol identifier
-		[]byte{0xde, 0xad, 0xbe, 0xef, 0x01, 0x02, 0x03, 0x04}, // Identity key
-		[]byte("https://example.com"),                          // Domain where service is hosted
-		[]byte("tm_bridge"),                                    // Topic/service supported
+		{0xde, 0xad, 0xbe, 0xef, 0x01, 0x02, 0x03, 0x04}, // Identity key
+		[]byte("https://example.com"),                    // Domain where service is hosted
+		[]byte("tm_bridge"),                              // Topic/service supported
 	}
 
 	// Add fields to script

@@ -115,10 +115,10 @@ func TestOutputAdmittedByTopic_Success(t *testing.T) {
 
 	// Create valid PushDrop script with SHIP data
 	fields := [][]byte{
-		[]byte("SHIP"),                 // Protocol identifier
-		[]byte{0x01, 0x02, 0x03, 0x04}, // Identity key bytes
-		[]byte("https://example.com"),  // Domain
-		[]byte("tm_bridge"),            // Topic
+		[]byte("SHIP"),                // Protocol identifier
+		{0x01, 0x02, 0x03, 0x04},      // Identity key bytes
+		[]byte("https://example.com"), // Domain
+		[]byte("tm_bridge"),           // Topic
 	}
 	validScriptHex := createValidPushDropScript(fields)
 	scriptObj, err := script.NewFromHex(validScriptHex)
@@ -215,7 +215,7 @@ func TestOutputAdmittedByTopic_InsufficientFields(t *testing.T) {
 	// Create PushDrop script with only 2 fields instead of required 4
 	fields := [][]byte{
 		[]byte("SHIP"),
-		[]byte{0x01, 0x02, 0x03, 0x04},
+		{0x01, 0x02, 0x03, 0x04},
 	}
 	invalidScriptHex := createValidPushDropScript(fields)
 	scriptObj, err := script.NewFromHex(invalidScriptHex)
@@ -248,10 +248,10 @@ func TestOutputAdmittedByTopic_IgnoreNonSHIPProtocol(t *testing.T) {
 
 	// Create valid PushDrop script with SLAP protocol instead of SHIP
 	fields := [][]byte{
-		[]byte("SLAP"),                 // Different protocol
-		[]byte{0x01, 0x02, 0x03, 0x04}, // Identity key bytes
-		[]byte("https://example.com"),  // Domain
-		[]byte("tm_bridge"),            // Topic
+		[]byte("SLAP"),                // Different protocol
+		{0x01, 0x02, 0x03, 0x04},      // Identity key bytes
+		[]byte("https://example.com"), // Domain
+		[]byte("tm_bridge"),           // Topic
 	}
 	validScriptHex := createValidPushDropScript(fields)
 	scriptObj, err := script.NewFromHex(validScriptHex)
@@ -620,10 +620,10 @@ func TestOutputAdmittedByTopic_StorageError(t *testing.T) {
 
 	// Create valid PushDrop script with SHIP data
 	fields := [][]byte{
-		[]byte("SHIP"),                 // Protocol identifier
-		[]byte{0x01, 0x02, 0x03, 0x04}, // Identity key bytes
-		[]byte("https://example.com"),  // Domain
-		[]byte("tm_bridge"),            // Topic
+		[]byte("SHIP"),                // Protocol identifier
+		{0x01, 0x02, 0x03, 0x04},      // Identity key bytes
+		[]byte("https://example.com"), // Domain
+		[]byte("tm_bridge"),           // Topic
 	}
 	validScriptHex := createValidPushDropScript(fields)
 	scriptObj, err := script.NewFromHex(validScriptHex)

@@ -290,7 +290,7 @@ func (w *WalletAdvertiser) CreateAdvertisements(adsData []*oa.AdvertisementData)
 		if !utils.IsValidTopicOrServiceName(ad.TopicOrServiceName) {
 			return overlay.TaggedBEEF{}, fmt.Errorf("invalid topic or service name: %s", ad.TopicOrServiceName)
 		}
-		var protocol = wallet.Protocol{SecurityLevel: wallet.SecurityLevelEveryAppAndCounterparty}
+		protocol := wallet.Protocol{SecurityLevel: wallet.SecurityLevelEveryAppAndCounterparty}
 		if protocol.Protocol = string(ad.Protocol.ID()); protocol.Protocol == "" {
 			return overlay.TaggedBEEF{}, fmt.Errorf("unsupported protocol: %s (must be 'SHIP' or 'SLAP')", ad.Protocol)
 		}
@@ -807,8 +807,10 @@ func (w *WalletAdvertiser) encodeVarInt(value uint64) []byte {
 	} else if value <= 0xffffffff {
 		return []byte{0xfe, byte(value), byte(value >> 8), byte(value >> 16), byte(value >> 24)}
 	} else {
-		return []byte{0xff, byte(value), byte(value >> 8), byte(value >> 16), byte(value >> 24),
-			byte(value >> 32), byte(value >> 40), byte(value >> 48), byte(value >> 56)}
+		return []byte{
+			0xff, byte(value), byte(value >> 8), byte(value >> 16), byte(value >> 24),
+			byte(value >> 32), byte(value >> 40), byte(value >> 48), byte(value >> 56),
+		}
 	}
 }
 
@@ -819,8 +821,10 @@ func (w *WalletAdvertiser) encodeUint32(value uint32) []byte {
 
 // encodeUint64 encodes a 64-bit unsigned integer in little endian format
 func (w *WalletAdvertiser) encodeUint64(value uint64) []byte {
-	return []byte{byte(value), byte(value >> 8), byte(value >> 16), byte(value >> 24),
-		byte(value >> 32), byte(value >> 40), byte(value >> 48), byte(value >> 56)}
+	return []byte{
+		byte(value), byte(value >> 8), byte(value >> 16), byte(value >> 24),
+		byte(value >> 32), byte(value >> 40), byte(value >> 48), byte(value >> 56),
+	}
 }
 
 // queryStorageForAdvertisements queries the storage service for advertisements of a specific protocol
