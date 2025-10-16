@@ -14,6 +14,7 @@ import (
 	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
 )
 
+// StorageInterface defines the interface for SLAP storage operations.
 type StorageInterface interface {
 	StoreSLAPRecord(ctx context.Context, txid string, outputIndex int, identityKey, domain, service string) error
 	DeleteSLAPRecord(ctx context.Context, txid string, outputIndex int) error
@@ -147,7 +148,9 @@ func (s *Storage) FindRecord(ctx context.Context, query types.SLAPQuery) ([]type
 	if err != nil {
 		return nil, fmt.Errorf("failed to find SLAP records: %w", err)
 	}
-	defer cursor.Close(ctx)
+	defer func() {
+		_ = cursor.Close(ctx)
+	}()
 
 	// Collect results
 	var results []types.UTXOReference
@@ -209,7 +212,9 @@ func (s *Storage) FindAll(ctx context.Context, limit, skip *int, sortOrder *type
 	if err != nil {
 		return nil, fmt.Errorf("failed to find all SLAP records: %w", err)
 	}
-	defer cursor.Close(ctx)
+	defer func() {
+		_ = cursor.Close(ctx)
+	}()
 
 	// Collect results
 	var results []types.UTXOReference

@@ -18,7 +18,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const TxId = "bdf1e48e845a65ba8c139c9b94844de30716f38d53787ba0a435e8705c4216d5"
+const TxID = "bdf1e48e845a65ba8c139c9b94844de30716f38d53787ba0a435e8705c4216d5"
+
+// Static error variables for testing
+var (
+	errTestStorage = errors.New("storage error")
+)
 
 // Mock implementations for testing
 
@@ -52,7 +57,7 @@ func (m *MockStorage) EnsureIndexes(ctx context.Context) error {
 	return args.Error(0)
 }
 
-// Note: Mock PushDropDecoder and Utils are no longer needed since we use real implementations
+// Mock PushDropDecoder and Utils are no longer needed since we use real implementations
 
 // Test helper functions
 
@@ -72,24 +77,34 @@ func createValidPushDropScript(fields [][]byte) string {
 	s := &script.Script{}
 
 	// Add public key
-	s.AppendPushData(pubKeyBytes)
+	if err := s.AppendPushData(pubKeyBytes); err != nil {
+		return ""
+	}
 
 	// Add OP_CHECKSIG
-	s.AppendOpcodes(script.OpCHECKSIG)
+	if err := s.AppendOpcodes(script.OpCHECKSIG); err != nil {
+		return ""
+	}
 
 	// Add fields using PushData
 	for _, field := range fields {
-		s.AppendPushData(field)
+		if err := s.AppendPushData(field); err != nil {
+			return ""
+		}
 	}
 
 	// Add DROP operations to remove fields from stack
 	notYetDropped := len(fields)
 	for notYetDropped > 1 {
-		s.AppendOpcodes(script.Op2DROP)
+		if err := s.AppendOpcodes(script.Op2DROP); err != nil {
+			return ""
+		}
 		notYetDropped -= 2
 	}
 	if notYetDropped != 0 {
-		s.AppendOpcodes(script.OpDROP)
+		if err := s.AppendOpcodes(script.OpDROP); err != nil {
+			return ""
+		}
 	}
 
 	return s.String()
@@ -125,7 +140,7 @@ func TestOutputAdmittedByTopic_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create outpoint
-	txidBytes, err := hex.DecodeString(TxId)
+	txidBytes, err := hex.DecodeString(TxID)
 	require.NoError(t, err)
 	var txidArray [32]byte
 	copy(txidArray[:], txidBytes)
@@ -142,13 +157,13 @@ func TestOutputAdmittedByTopic_Success(t *testing.T) {
 	}
 
 	// Set up mock for storage (txid is now hex-encoded from outpoint)
-	mockStorage.On("StoreSHIPRecord", mock.Anything, TxId, 0, "01020304", "https://example.com", "tm_bridge").Return(nil)
+	mockStorage.On("StoreSHIPRecord", mock.Anything, TxID, 0, "01020304", "https://example.com", "tm_bridge").Return(nil)
 
 	// Execute
 	err = service.OutputAdmittedByTopic(context.Background(), payload)
 
 	// Assert
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	mockStorage.AssertExpectations(t)
 }
 
@@ -160,7 +175,7 @@ func TestOutputAdmittedByTopic_IgnoreNonSHIPTopic(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create outpoint
-	txidBytes, err := hex.DecodeString(TxId)
+	txidBytes, err := hex.DecodeString(TxID)
 	require.NoError(t, err)
 	var txidArray [32]byte
 	copy(txidArray[:], txidBytes)
@@ -177,7 +192,7 @@ func TestOutputAdmittedByTopic_IgnoreNonSHIPTopic(t *testing.T) {
 	}
 
 	err = service.OutputAdmittedByTopic(context.Background(), payload)
-	assert.NoError(t, err) // Should silently ignore non-SHIP topics
+	require.NoError(t, err) // Should silently ignore non-SHIP topics
 }
 
 func TestOutputAdmittedByTopic_PushDropDecodeError(t *testing.T) {
@@ -188,7 +203,7 @@ func TestOutputAdmittedByTopic_PushDropDecodeError(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create outpoint
-	txidBytes, err := hex.DecodeString(TxId)
+	txidBytes, err := hex.DecodeString(TxID)
 	require.NoError(t, err)
 	var txidArray [32]byte
 	copy(txidArray[:], txidBytes)
@@ -205,7 +220,7 @@ func TestOutputAdmittedByTopic_PushDropDecodeError(t *testing.T) {
 	}
 
 	err = service.OutputAdmittedByTopic(context.Background(), payload)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to decode PushDrop locking script")
 }
 
@@ -222,7 +237,7 @@ func TestOutputAdmittedByTopic_InsufficientFields(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create outpoint
-	txidBytes, err := hex.DecodeString(TxId)
+	txidBytes, err := hex.DecodeString(TxID)
 	require.NoError(t, err)
 	var txidArray [32]byte
 	copy(txidArray[:], txidBytes)
@@ -239,8 +254,9 @@ func TestOutputAdmittedByTopic_InsufficientFields(t *testing.T) {
 	}
 
 	err = service.OutputAdmittedByTopic(context.Background(), payload)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "expected at least 4 fields, got 2")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "expected at least 4 fields")
+	assert.Contains(t, err.Error(), "got 2")
 }
 
 func TestOutputAdmittedByTopic_IgnoreNonSHIPProtocol(t *testing.T) {
@@ -258,7 +274,7 @@ func TestOutputAdmittedByTopic_IgnoreNonSHIPProtocol(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create outpoint
-	txidBytes, err := hex.DecodeString(TxId)
+	txidBytes, err := hex.DecodeString(TxID)
 	require.NoError(t, err)
 	var txidArray [32]byte
 	copy(txidArray[:], txidBytes)
@@ -275,7 +291,7 @@ func TestOutputAdmittedByTopic_IgnoreNonSHIPProtocol(t *testing.T) {
 	}
 
 	err = service.OutputAdmittedByTopic(context.Background(), payload)
-	assert.NoError(t, err) // Should silently ignore non-SHIP protocols
+	require.NoError(t, err) // Should silently ignore non-SHIP protocols
 }
 
 // Test OutputSpent
@@ -284,7 +300,7 @@ func TestOutputSpent_Success(t *testing.T) {
 	service, mockStorage := createTestSHIPLookupService()
 
 	// Create outpoint
-	txidBytes, err := hex.DecodeString(TxId)
+	txidBytes, err := hex.DecodeString(TxID)
 	require.NoError(t, err)
 	var txidArray [32]byte
 	copy(txidArray[:], txidBytes)
@@ -299,10 +315,10 @@ func TestOutputSpent_Success(t *testing.T) {
 		Outpoint: outpoint,
 	}
 
-	mockStorage.On("DeleteSHIPRecord", mock.Anything, TxId, 0).Return(nil)
+	mockStorage.On("DeleteSHIPRecord", mock.Anything, TxID, 0).Return(nil)
 
 	err = service.OutputSpent(context.Background(), payload)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	mockStorage.AssertExpectations(t)
 }
 
@@ -310,7 +326,7 @@ func TestOutputSpent_IgnoreNonSHIPTopic(t *testing.T) {
 	service, _ := createTestSHIPLookupService()
 
 	// Create outpoint
-	txidBytes, err := hex.DecodeString(TxId)
+	txidBytes, err := hex.DecodeString(TxID)
 	require.NoError(t, err)
 	var txidArray [32]byte
 	copy(txidArray[:], txidBytes)
@@ -326,7 +342,7 @@ func TestOutputSpent_IgnoreNonSHIPTopic(t *testing.T) {
 	}
 
 	err = service.OutputSpent(context.Background(), payload)
-	assert.NoError(t, err) // Should silently ignore non-SHIP topics
+	require.NoError(t, err) // Should silently ignore non-SHIP topics
 }
 
 // Test OutputEvicted
@@ -335,7 +351,7 @@ func TestOutputEvicted_Success(t *testing.T) {
 	service, mockStorage := createTestSHIPLookupService()
 
 	// Create outpoint
-	txidBytes, err := hex.DecodeString(TxId)
+	txidBytes, err := hex.DecodeString(TxID)
 	require.NoError(t, err)
 	var txidArray [32]byte
 	copy(txidArray[:], txidBytes)
@@ -345,10 +361,10 @@ func TestOutputEvicted_Success(t *testing.T) {
 		Index: 0,
 	}
 
-	mockStorage.On("DeleteSHIPRecord", mock.Anything, TxId, 0).Return(nil)
+	mockStorage.On("DeleteSHIPRecord", mock.Anything, TxID, 0).Return(nil)
 
 	err = service.OutputEvicted(context.Background(), outpoint)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	mockStorage.AssertExpectations(t)
 }
 
@@ -356,7 +372,7 @@ func TestOutputEvicted_StorageError(t *testing.T) {
 	service, mockStorage := createTestSHIPLookupService()
 
 	// Create outpoint
-	txidBytes, err := hex.DecodeString(TxId)
+	txidBytes, err := hex.DecodeString(TxID)
 	require.NoError(t, err)
 	var txidArray [32]byte
 	copy(txidArray[:], txidBytes)
@@ -366,10 +382,10 @@ func TestOutputEvicted_StorageError(t *testing.T) {
 		Index: 0,
 	}
 
-	mockStorage.On("DeleteSHIPRecord", mock.Anything, TxId, 0).Return(errors.New("storage error"))
+	mockStorage.On("DeleteSHIPRecord", mock.Anything, TxID, 0).Return(errTestStorage)
 
 	err = service.OutputEvicted(context.Background(), outpoint)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "storage error")
 }
 
@@ -391,7 +407,7 @@ func TestLookup_LegacyFindAll(t *testing.T) {
 	mockStorage.On("FindAll", mock.Anything, (*int)(nil), (*int)(nil), (*types.SortOrder)(nil)).Return(expectedResults, nil)
 
 	results, err := service.Lookup(context.Background(), question)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, lookup.AnswerTypeFreeform, results.Type)
 	if utxos, ok := results.Result.([]types.UTXOReference); ok {
 		assert.Equal(t, expectedResults, utxos)
@@ -410,7 +426,7 @@ func TestLookup_NilQuery(t *testing.T) {
 	}
 
 	_, err := service.Lookup(context.Background(), question)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "a valid query must be provided")
 }
 
@@ -423,7 +439,7 @@ func TestLookup_WrongService(t *testing.T) {
 	}
 
 	_, err := service.Lookup(context.Background(), question)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "lookup service not supported")
 }
 
@@ -436,7 +452,7 @@ func TestLookup_InvalidStringQuery(t *testing.T) {
 	}
 
 	_, err := service.Lookup(context.Background(), question)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid string query: only 'findAll' is supported")
 }
 
@@ -455,7 +471,8 @@ func TestLookup_ObjectQuery_FindAll(t *testing.T) {
 		"sortOrder": sortOrder,
 	}
 
-	queryJSON, _ := json.Marshal(query)
+	queryJSON, err := json.Marshal(query)
+	require.NoError(t, err)
 	question := &lookup.LookupQuestion{
 		Service: Service,
 		Query:   queryJSON,
@@ -468,7 +485,7 @@ func TestLookup_ObjectQuery_FindAll(t *testing.T) {
 	mockStorage.On("FindAll", mock.Anything, &limit, &skip, &sortOrder).Return(expectedResults, nil)
 
 	results, err := service.Lookup(context.Background(), question)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, lookup.AnswerTypeFreeform, results.Type)
 	if utxos, ok := results.Result.([]types.UTXOReference); ok {
 		assert.Equal(t, expectedResults, utxos)
@@ -491,7 +508,8 @@ func TestLookup_ObjectQuery_SpecificQuery(t *testing.T) {
 		"identityKey": identityKey,
 	}
 
-	queryJSON, _ := json.Marshal(query)
+	queryJSON, err := json.Marshal(query)
+	require.NoError(t, err)
 	question := &lookup.LookupQuestion{
 		Service: Service,
 		Query:   queryJSON,
@@ -510,7 +528,7 @@ func TestLookup_ObjectQuery_SpecificQuery(t *testing.T) {
 	mockStorage.On("FindRecord", mock.Anything, expectedQuery).Return(expectedResults, nil)
 
 	results, err := service.Lookup(context.Background(), question)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, lookup.AnswerTypeFreeform, results.Type)
 	if utxos, ok := results.Result.([]types.UTXOReference); ok {
 		assert.Equal(t, expectedResults, utxos)
@@ -527,14 +545,15 @@ func TestLookup_ValidationError_NegativeLimit(t *testing.T) {
 		"limit": -1,
 	}
 
-	queryJSON, _ := json.Marshal(query)
+	queryJSON, err := json.Marshal(query)
+	require.NoError(t, err)
 	question := &lookup.LookupQuestion{
 		Service: Service,
 		Query:   queryJSON,
 	}
 
-	_, err := service.Lookup(context.Background(), question)
-	assert.Error(t, err)
+	_, err = service.Lookup(context.Background(), question)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "query.limit must be a positive number")
 }
 
@@ -545,14 +564,15 @@ func TestLookup_ValidationError_NegativeSkip(t *testing.T) {
 		"skip": -1,
 	}
 
-	queryJSON, _ := json.Marshal(query)
+	queryJSON, err := json.Marshal(query)
+	require.NoError(t, err)
 	question := &lookup.LookupQuestion{
 		Service: Service,
 		Query:   queryJSON,
 	}
 
-	_, err := service.Lookup(context.Background(), question)
-	assert.Error(t, err)
+	_, err = service.Lookup(context.Background(), question)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "query.skip must be a non-negative number")
 }
 
@@ -563,14 +583,15 @@ func TestLookup_ValidationError_InvalidSortOrder(t *testing.T) {
 		"sortOrder": "invalid",
 	}
 
-	queryJSON, _ := json.Marshal(query)
+	queryJSON, err := json.Marshal(query)
+	require.NoError(t, err)
 	question := &lookup.LookupQuestion{
 		Service: Service,
 		Query:   queryJSON,
 	}
 
-	_, err := service.Lookup(context.Background(), question)
-	assert.Error(t, err)
+	_, err = service.Lookup(context.Background(), question)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "query.sortOrder must be 'asc' or 'desc'")
 }
 
@@ -608,10 +629,10 @@ func TestLookup_StorageError(t *testing.T) {
 		Query:   json.RawMessage(`"findAll"`),
 	}
 
-	mockStorage.On("FindAll", mock.Anything, (*int)(nil), (*int)(nil), (*types.SortOrder)(nil)).Return([]types.UTXOReference{}, errors.New("storage error"))
+	mockStorage.On("FindAll", mock.Anything, (*int)(nil), (*int)(nil), (*types.SortOrder)(nil)).Return([]types.UTXOReference{}, errTestStorage)
 
 	_, err := service.Lookup(context.Background(), question)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "storage error")
 }
 
@@ -630,7 +651,7 @@ func TestOutputAdmittedByTopic_StorageError(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create outpoint
-	txidBytes, err := hex.DecodeString(TxId)
+	txidBytes, err := hex.DecodeString(TxID)
 	require.NoError(t, err)
 	var txidArray [32]byte
 	copy(txidArray[:], txidBytes)
@@ -646,10 +667,10 @@ func TestOutputAdmittedByTopic_StorageError(t *testing.T) {
 		LockingScript: scriptObj,
 	}
 
-	mockStorage.On("StoreSHIPRecord", mock.Anything, TxId, 0, "01020304", "https://example.com", "tm_bridge").Return(errors.New("storage error"))
+	mockStorage.On("StoreSHIPRecord", mock.Anything, TxID, 0, "01020304", "https://example.com", "tm_bridge").Return(errTestStorage)
 
 	err = service.OutputAdmittedByTopic(context.Background(), payload)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "storage error")
 }
 
@@ -674,7 +695,8 @@ func TestLookup_ComplexObjectQuery(t *testing.T) {
 		"sortOrder":   sortOrder,
 	}
 
-	queryJSON, _ := json.Marshal(query)
+	queryJSON, err := json.Marshal(query)
+	require.NoError(t, err)
 	question := &lookup.LookupQuestion{
 		Service: Service,
 		Query:   queryJSON,
@@ -697,7 +719,7 @@ func TestLookup_ComplexObjectQuery(t *testing.T) {
 	mockStorage.On("FindRecord", mock.Anything, expectedQuery).Return(expectedResults, nil)
 
 	results, err := service.Lookup(context.Background(), question)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, lookup.AnswerTypeFreeform, results.Type)
 	if utxos, ok := results.Result.([]types.UTXOReference); ok {
 		assert.Equal(t, expectedResults, utxos)
@@ -720,7 +742,7 @@ func TestSHIPLookupService_OutputNoLongerRetainedInHistory(t *testing.T) {
 
 	// Test that OutputNoLongerRetainedInHistory does nothing (no-op)
 	err := service.OutputNoLongerRetainedInHistory(context.Background(), outpoint, "tm_ship")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Verify no storage methods were called
 	mockStorage.AssertExpectations(t)
@@ -740,7 +762,7 @@ func TestSHIPLookupService_OutputBlockHeightUpdated(t *testing.T) {
 
 	// Test that OutputBlockHeightUpdated does nothing (no-op)
 	err = service.OutputBlockHeightUpdated(context.Background(), txid, 12345, 0)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Verify no storage methods were called
 	mockStorage.AssertExpectations(t)

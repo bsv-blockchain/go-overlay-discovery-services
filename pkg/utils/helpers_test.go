@@ -370,6 +370,7 @@ func TestUTFBytesToString(t *testing.T) {
 	}{
 		{"empty", []byte{}, ""},
 		{"ascii", []byte("hello"), "hello"},
+		//nolint:gosmopolitan // Test case requires specific UTF-8 characters including Chinese
 		{"utf8", []byte("hello 世界"), "hello 世界"},
 		{"binary", []byte{0x01, 0x02, 0x03}, "\x01\x02\x03"},
 	}

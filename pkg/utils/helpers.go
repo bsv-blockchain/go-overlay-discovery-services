@@ -11,6 +11,13 @@ import (
 	"github.com/bsv-blockchain/go-sdk/wallet"
 )
 
+// Static error variables for err113 compliance
+var (
+	errInsufficientTokenFields = errors.New("insufficient fields in token (need at least protocol, identity key, and signature)")
+	errUnknownProtocol         = errors.New("unknown protocol")
+	errMissingIdentityKeyField = errors.New("missing identity key field")
+)
+
 // TokenFields represents the fields of a PushDrop token for SHIP or SLAP advertisement
 type TokenFields [][]byte
 
@@ -31,7 +38,7 @@ type TokenFields [][]byte
 //   - error: error if validation fails due to technical issues (nil for invalid signatures)
 func IsTokenSignatureCorrectlyLinked(ctx context.Context, lockingPublicKey string, fields TokenFields) (bool, error) {
 	if len(fields) < 3 {
-		return false, errors.New("insufficient fields in token (need at least protocol, identity key, and signature)")
+		return false, errInsufficientTokenFields
 	}
 
 	// Make a copy to avoid mutating the original
@@ -48,12 +55,12 @@ func IsTokenSignatureCorrectlyLinked(ctx context.Context, lockingPublicKey strin
 
 	protocolID := string(overlay.Protocol(protocolString).ID())
 	if protocolID == "" {
-		return false, fmt.Errorf("unknown protocol: %s", protocolString)
+		return false, fmt.Errorf("%w: %s", errUnknownProtocol, protocolString)
 	}
 
 	// The identity key is in the second field
 	if len(dataFields) < 2 {
-		return false, errors.New("missing identity key field")
+		return false, errMissingIdentityKeyField
 	}
 	identityKeyBytes := dataFields[1]
 	identityKey, err := ec.PublicKeyFromBytes(identityKeyBytes)

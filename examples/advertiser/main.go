@@ -3,8 +3,9 @@
 package main
 
 import (
-	"fmt"
 	"log"
+	"log/slog"
+	"os"
 
 	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/advertiser"
 	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
@@ -14,8 +15,10 @@ import (
 )
 
 func main() {
-	fmt.Println("BSV Overlay Discovery Services - WalletAdvertiser Example")
-	fmt.Println("========================================================")
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
+	logger.Info("BSV Overlay Discovery Services - WalletAdvertiser Example")
+	logger.Info("========================================================")
 
 	// Example configuration
 	chain := "main"
@@ -31,7 +34,7 @@ func main() {
 	}
 
 	// Create a new WalletAdvertiser
-	fmt.Println("\n1. Creating WalletAdvertiser...")
+	logger.Info("Creating WalletAdvertiser", slog.String("step", "1"))
 	advertiser, err := advertiser.NewWalletAdvertiser(
 		chain,
 		privateKey,
@@ -42,26 +45,26 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create WalletAdvertiser: %v", err)
 	}
-	fmt.Printf("✓ WalletAdvertiser created successfully\n")
-	fmt.Printf("  Chain: %s\n", advertiser.GetChain())
-	fmt.Printf("  Storage URL: %s\n", advertiser.GetStorageURL())
-	fmt.Printf("  Advertisable URI: %s\n", advertiser.GetAdvertisableURI())
+	logger.Info("WalletAdvertiser created successfully",
+		slog.String("chain", advertiser.GetChain()),
+		slog.String("storageURL", advertiser.GetStorageURL()),
+		slog.String("advertisableURI", advertiser.GetAdvertisableURI()))
 
 	// Set up mock dependencies (in a real scenario, these would be actual implementations)
-	fmt.Println("\n2. Setting up dependencies...")
+	logger.Info("Setting up dependencies", slog.String("step", "2"))
 	advertiser.SetSkipStorageValidation(true) // Skip storage validation for example
-	fmt.Println("✓ Dependencies configured")
+	logger.Info("Dependencies configured")
 
 	// Initialize the advertiser
-	fmt.Println("\n3. Initializing WalletAdvertiser...")
-	if err := advertiser.Init(); err != nil {
+	logger.Info("Initializing WalletAdvertiser", slog.String("step", "3"))
+	if err = advertiser.Init(); err != nil {
 		log.Fatalf("Failed to initialize WalletAdvertiser: %v", err)
 	}
-	fmt.Printf("✓ WalletAdvertiser initialized successfully\n")
-	fmt.Printf("  Initialized: %v\n", advertiser.IsInitialized())
+	logger.Info("WalletAdvertiser initialized successfully",
+		slog.Bool("initialized", advertiser.IsInitialized()))
 
 	// Create some example advertisements
-	fmt.Println("\n4. Creating advertisements...")
+	logger.Info("Creating advertisements", slog.String("step", "4"))
 	adsData := []*oa.AdvertisementData{
 		{
 			Protocol:           overlay.ProtocolSHIP,
@@ -73,41 +76,41 @@ func main() {
 		},
 	}
 
-	// Note: This will fail in the current implementation since BSV SDK integration is not complete
+	// This will fail in the current implementation since BSV SDK integration is not complete
 	_, err = advertiser.CreateAdvertisements(adsData)
 	if err != nil {
-		fmt.Printf("⚠ CreateAdvertisements failed (expected): %v\n", err)
-		fmt.Println("   This is expected as BSV SDK integration is not yet implemented")
+		logger.Warn("CreateAdvertisements failed (expected)", slog.String("error", err.Error()))
+		logger.Info("This is expected as BSV SDK integration is not yet implemented")
 	}
 
 	// Parse an example advertisement
-	fmt.Println("\n5. Parsing an advertisement...")
+	logger.Info("Parsing an advertisement", slog.String("step", "5"))
 	outputScriptBytes := []byte{0x01, 0x02, 0x03, 0x04, 0x05} // Mock script
 	outputScript := script.NewFromBytes(outputScriptBytes)
 	advertisement, err := advertiser.ParseAdvertisement(outputScript)
 	if err != nil {
-		fmt.Printf("Failed to parse advertisement: %v\n", err)
+		logger.Error("Failed to parse advertisement", slog.String("error", err.Error()))
 	} else {
-		fmt.Printf("✓ Advertisement parsed successfully:\n")
-		fmt.Printf("  Protocol: %s\n", advertisement.Protocol)
-		fmt.Printf("  Identity Key: %s\n", advertisement.IdentityKey)
-		fmt.Printf("  Domain: %s\n", advertisement.Domain)
-		fmt.Printf("  Topic/Service: %s\n", advertisement.TopicOrService)
+		logger.Info("Advertisement parsed successfully",
+			slog.Any("protocol", advertisement.Protocol),
+			slog.String("identityKey", advertisement.IdentityKey),
+			slog.String("domain", advertisement.Domain),
+			slog.String("topicService", advertisement.TopicOrService))
 	}
 
 	// Find all advertisements for a protocol
-	fmt.Println("\n6. Finding advertisements...")
+	logger.Info("Finding advertisements", slog.String("step", "6"))
 	_, err = advertiser.FindAllAdvertisements(overlay.ProtocolSHIP)
 	if err != nil {
-		fmt.Printf("⚠ FindAllAdvertisements failed (expected): %v\n", err)
-		fmt.Println("   This is expected as storage integration is not yet implemented")
+		logger.Warn("FindAllAdvertisements failed (expected)", slog.String("error", err.Error()))
+		logger.Info("This is expected as storage integration is not yet implemented")
 	}
 
-	fmt.Println("\n✓ Example completed successfully!")
-	fmt.Println("\nNote: Some operations failed as expected because they require:")
-	fmt.Println("- BSV SDK integration for transaction creation and signing")
-	fmt.Println("- Storage backend integration for persistence")
-	fmt.Println("- Real PushDrop decoder implementation")
+	logger.Info("Example completed successfully")
+	logger.Info("Note: Some operations failed as expected because they require:")
+	logger.Info("- BSV SDK integration for transaction creation and signing")
+	logger.Info("- Storage backend integration for persistence")
+	logger.Info("- Real PushDrop decoder implementation")
 }
 
 // Helper functions

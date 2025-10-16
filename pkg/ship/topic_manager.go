@@ -4,6 +4,7 @@ package ship
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"log/slog"
@@ -15,6 +16,15 @@ import (
 	"github.com/bsv-blockchain/go-sdk/overlay"
 	"github.com/bsv-blockchain/go-sdk/transaction"
 	"github.com/bsv-blockchain/go-sdk/transaction/template/pushdrop"
+)
+
+// Static error variables for err113 compliance
+var (
+	errTopicNameEmpty         = errors.New("topic name cannot be empty")
+	errMessageHandlerNil      = errors.New("message handler cannot be nil")
+	errNotSubscribedToTopic   = errors.New("not subscribed to topic")
+	errMessageTopicEmpty      = errors.New("message topic cannot be empty")
+	errNoHandlerFoundForTopic = errors.New("no handler found for topic")
 )
 
 // TopicSubscription represents an active topic subscription
@@ -75,13 +85,13 @@ func NewTopicManager(storage StorageInterface, lookupService *LookupService) *To
 // SubscribeToTopic subscribes to a specific topic with a message handler.
 // Creates a new subscription if one doesn't exist, or updates an existing one.
 // The provided handler will be called for all messages received on this topic.
-func (tm *TopicManager) SubscribeToTopic(ctx context.Context, topic string, handler TopicMessageHandler) error {
+func (tm *TopicManager) SubscribeToTopic(_ context.Context, topic string, handler TopicMessageHandler) error {
 	if topic == "" {
-		return fmt.Errorf("topic name cannot be empty")
+		return errTopicNameEmpty
 	}
 
 	if handler == nil {
-		return fmt.Errorf("message handler cannot be nil")
+		return errMessageHandlerNil
 	}
 
 	tm.mutex.Lock()
@@ -111,9 +121,9 @@ func (tm *TopicManager) SubscribeToTopic(ctx context.Context, topic string, hand
 // UnsubscribeFromTopic unsubscribes from a specific topic.
 // Marks the subscription as inactive and removes the message handler.
 // The subscription record is kept for historical purposes.
-func (tm *TopicManager) UnsubscribeFromTopic(ctx context.Context, topic string) error {
+func (tm *TopicManager) UnsubscribeFromTopic(_ context.Context, topic string) error {
 	if topic == "" {
-		return fmt.Errorf("topic name cannot be empty")
+		return errTopicNameEmpty
 	}
 
 	tm.mutex.Lock()
@@ -121,7 +131,7 @@ func (tm *TopicManager) UnsubscribeFromTopic(ctx context.Context, topic string) 
 
 	subscription, exists := tm.subscriptions[topic]
 	if !exists {
-		return fmt.Errorf("not subscribed to topic: %s", topic)
+		return fmt.Errorf("%w: %s", errNotSubscribedToTopic, topic)
 	}
 
 	// Mark subscription as inactive
@@ -138,7 +148,7 @@ func (tm *TopicManager) UnsubscribeFromTopic(ctx context.Context, topic string) 
 // Updates message statistics for the topic.
 func (tm *TopicManager) HandleTopicMessage(ctx context.Context, message TopicMessage) error {
 	if message.Topic == "" {
-		return fmt.Errorf("message topic cannot be empty")
+		return errMessageTopicEmpty
 	}
 
 	tm.mutex.RLock()
@@ -153,7 +163,7 @@ func (tm *TopicManager) HandleTopicMessage(ctx context.Context, message TopicMes
 	}
 
 	if !handlerExists {
-		return fmt.Errorf("no handler found for topic: %s", message.Topic)
+		return fmt.Errorf("%w: %s", errNoHandlerFoundForTopic, message.Topic)
 	}
 
 	// Update message count
@@ -186,9 +196,9 @@ func (tm *TopicManager) GetSubscribedTopics() []TopicSubscription {
 
 // CreateTopicSubscription creates a new topic subscription without a handler.
 // This method is useful for creating subscription records before setting up handlers.
-func (tm *TopicManager) CreateTopicSubscription(ctx context.Context, topic string) (*TopicSubscription, error) {
+func (tm *TopicManager) CreateTopicSubscription(_ context.Context, topic string) (*TopicSubscription, error) {
 	if topic == "" {
-		return nil, fmt.Errorf("topic name cannot be empty")
+		return nil, errTopicNameEmpty
 	}
 
 	tm.mutex.Lock()
@@ -236,7 +246,7 @@ func (tm *TopicManager) GetTopicMessageCount(topic string) int64 {
 
 // Close cleanly shuts down the topic manager.
 // Unsubscribes from all topics and cleans up resources.
-func (tm *TopicManager) Close(ctx context.Context) error {
+func (tm *TopicManager) Close(_ context.Context) error {
 	tm.mutex.Lock()
 	defer tm.mutex.Unlock()
 
@@ -343,12 +353,12 @@ func (tm *TopicManager) IdentifyAdmissibleOutputs(ctx context.Context, beef []by
 		// Check token signature linkage
 		lockingPublicKey := result.LockingPublicKey.ToDERHex()
 		tokenFields := make(utils.TokenFields, len(result.Fields))
-		for j, field := range result.Fields {
-			tokenFields[j] = field
-		}
+		copy(tokenFields, result.Fields)
 
 		if valid, err := utils.IsTokenSignatureCorrectlyLinked(ctx, lockingPublicKey, tokenFields); err == nil && valid {
-			outputsToAdmit = append(outputsToAdmit, uint32(i))
+			if i >= 0 && i <= 0xFFFFFFFF {
+				outputsToAdmit = append(outputsToAdmit, uint32(i))
+			}
 		} else if err == nil && !valid {
 			slog.Info("Invalid token signature linkage", "outputIndex", i, "txid", parsedTransaction.TxID())
 		}
@@ -383,7 +393,7 @@ func (tm *TopicManager) IdentifyAdmissibleOutputs(ctx context.Context, beef []by
 
 // IdentifyNeededInputs implements the engine.TopicManager interface
 // For SHIP, this identifies inputs needed for validation
-func (tm *TopicManager) IdentifyNeededInputs(ctx context.Context, beef []byte) ([]*transaction.Outpoint, error) {
+func (tm *TopicManager) IdentifyNeededInputs(_ context.Context, _ []byte) ([]*transaction.Outpoint, error) {
 	// SHIP doesn't require specific inputs for validation
 	return []*transaction.Outpoint{}, nil
 }

@@ -1,3 +1,4 @@
+//nolint:revive // Package name is descriptive in context
 package utils
 
 import (

@@ -4,6 +4,7 @@ package slap
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"log/slog"
@@ -15,6 +16,17 @@ import (
 	"github.com/bsv-blockchain/go-sdk/overlay"
 	"github.com/bsv-blockchain/go-sdk/transaction"
 	"github.com/bsv-blockchain/go-sdk/transaction/template/pushdrop"
+)
+
+// Static error variables for err113 compliance
+var (
+	errServiceNameEmpty         = errors.New("service name cannot be empty")
+	errDomainEmpty              = errors.New("domain cannot be empty")
+	errMessageHandlerNil        = errors.New("message handler cannot be nil")
+	errNotSubscribedToService   = errors.New("not subscribed to service")
+	errMessageServiceEmpty      = errors.New("message service cannot be empty")
+	errMessageDomainEmpty       = errors.New("message domain cannot be empty")
+	errNoHandlerFoundForService = errors.New("no handler found for service")
 )
 
 // ServiceSubscription represents an active service subscription for SLAP protocol
@@ -86,17 +98,17 @@ func (tm *TopicManager) getSubscriptionKey(service, domain string) string {
 // SubscribeToService subscribes to a specific service with a message handler.
 // Creates a new subscription if one doesn't exist, or updates an existing one.
 // The provided handler will be called for all messages received for this service.
-func (tm *TopicManager) SubscribeToService(ctx context.Context, service, domain string, handler ServiceMessageHandler) error {
+func (tm *TopicManager) SubscribeToService(_ context.Context, service, domain string, handler ServiceMessageHandler) error {
 	if service == "" {
-		return fmt.Errorf("service name cannot be empty")
+		return errServiceNameEmpty
 	}
 
 	if domain == "" {
-		return fmt.Errorf("domain cannot be empty")
+		return errDomainEmpty
 	}
 
 	if handler == nil {
-		return fmt.Errorf("message handler cannot be nil")
+		return errMessageHandlerNil
 	}
 
 	tm.mutex.Lock()
@@ -129,13 +141,13 @@ func (tm *TopicManager) SubscribeToService(ctx context.Context, service, domain 
 // UnsubscribeFromService unsubscribes from a specific service.
 // Marks the subscription as inactive and removes the message handler.
 // The subscription record is kept for historical purposes.
-func (tm *TopicManager) UnsubscribeFromService(ctx context.Context, service, domain string) error {
+func (tm *TopicManager) UnsubscribeFromService(_ context.Context, service, domain string) error {
 	if service == "" {
-		return fmt.Errorf("service name cannot be empty")
+		return errServiceNameEmpty
 	}
 
 	if domain == "" {
-		return fmt.Errorf("domain cannot be empty")
+		return errDomainEmpty
 	}
 
 	tm.mutex.Lock()
@@ -145,7 +157,7 @@ func (tm *TopicManager) UnsubscribeFromService(ctx context.Context, service, dom
 
 	subscription, exists := tm.subscriptions[subscriptionKey]
 	if !exists {
-		return fmt.Errorf("not subscribed to service: %s@%s", service, domain)
+		return fmt.Errorf("%w: %s@%s", errNotSubscribedToService, service, domain)
 	}
 
 	// Mark subscription as inactive
@@ -162,11 +174,11 @@ func (tm *TopicManager) UnsubscribeFromService(ctx context.Context, service, dom
 // Updates message statistics for the service.
 func (tm *TopicManager) HandleServiceMessage(ctx context.Context, message ServiceMessage) error {
 	if message.Service == "" {
-		return fmt.Errorf("message service cannot be empty")
+		return errMessageServiceEmpty
 	}
 
 	if message.Domain == "" {
-		return fmt.Errorf("message domain cannot be empty")
+		return errMessageDomainEmpty
 	}
 
 	subscriptionKey := tm.getSubscriptionKey(message.Service, message.Domain)
@@ -183,7 +195,7 @@ func (tm *TopicManager) HandleServiceMessage(ctx context.Context, message Servic
 	}
 
 	if !handlerExists {
-		return fmt.Errorf("no handler found for service: %s@%s", message.Service, message.Domain)
+		return fmt.Errorf("%w: %s@%s", errNoHandlerFoundForService, message.Service, message.Domain)
 	}
 
 	// Update message count
@@ -216,13 +228,13 @@ func (tm *TopicManager) GetSubscribedServices() []ServiceSubscription {
 
 // CreateServiceSubscription creates a new service subscription without a handler.
 // This method is useful for creating subscription records before setting up handlers.
-func (tm *TopicManager) CreateServiceSubscription(ctx context.Context, service, domain string) (*ServiceSubscription, error) {
+func (tm *TopicManager) CreateServiceSubscription(_ context.Context, service, domain string) (*ServiceSubscription, error) {
 	if service == "" {
-		return nil, fmt.Errorf("service name cannot be empty")
+		return nil, errServiceNameEmpty
 	}
 
 	if domain == "" {
-		return nil, fmt.Errorf("domain cannot be empty")
+		return nil, errDomainEmpty
 	}
 
 	tm.mutex.Lock()
@@ -275,7 +287,7 @@ func (tm *TopicManager) GetServiceMessageCount(service, domain string) int64 {
 
 // Close cleanly shuts down the topic manager.
 // Unsubscribes from all services and cleans up resources.
-func (tm *TopicManager) Close(ctx context.Context) error {
+func (tm *TopicManager) Close(_ context.Context) error {
 	tm.mutex.Lock()
 	defer tm.mutex.Unlock()
 
@@ -417,13 +429,13 @@ func (tm *TopicManager) IdentifyAdmissibleOutputs(ctx context.Context, beef []by
 		// Check token signature linkage
 		lockingPublicKey := result.LockingPublicKey.ToDERHex()
 		tokenFields := make(utils.TokenFields, len(result.Fields))
-		for j, field := range result.Fields {
-			tokenFields[j] = field
-		}
+		copy(tokenFields, result.Fields)
 
 		// For now, use mock wallet - in production this should be the real wallet
 		if valid, err := utils.IsTokenSignatureCorrectlyLinked(ctx, lockingPublicKey, tokenFields); err == nil && valid {
-			outputsToAdmit = append(outputsToAdmit, uint32(i))
+			if i >= 0 && i <= 0xFFFFFFFF {
+				outputsToAdmit = append(outputsToAdmit, uint32(i))
+			}
 		} else if err == nil && !valid {
 			slog.Info("Invalid token signature linkage", "outputIndex", i, "txid", parsedTransaction.TxID())
 		}
@@ -458,7 +470,7 @@ func (tm *TopicManager) IdentifyAdmissibleOutputs(ctx context.Context, beef []by
 
 // IdentifyNeededInputs implements the engine.TopicManager interface
 // For SLAP, this identifies inputs needed for validation
-func (tm *TopicManager) IdentifyNeededInputs(ctx context.Context, beef []byte) ([]*transaction.Outpoint, error) {
+func (tm *TopicManager) IdentifyNeededInputs(_ context.Context, _ []byte) ([]*transaction.Outpoint, error) {
 	// SLAP doesn't require specific inputs for validation
 	return []*transaction.Outpoint{}, nil
 }

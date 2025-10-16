@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"log/slog"
+	"os"
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -20,31 +22,33 @@ import (
 	"github.com/bsv-blockchain/go-sdk/transaction"
 )
 
+//nolint:gochecknoglobals // logger is used across multiple example functions
+var logger = slog.New(slog.NewTextHandler(os.Stdout, nil))
+
 func main() {
-	fmt.Println("=== SHIP Lookup Service Examples ===")
-	fmt.Println()
+	logger.Info("SHIP Lookup Service Examples")
 
 	// Run the various example functions
-	fmt.Println("1. Running OutputAdmittedByTopic API Demo:")
+	logger.Info("Running OutputAdmittedByTopic API Demo", slog.String("step", "1"))
 	ExampleOutputAdmittedByTopicDemo()
 
-	fmt.Println("\n2. Running SHIP Storage Interface Example:")
+	logger.Info("Running SHIP Storage Interface Example", slog.String("step", "2"))
 	ExampleSHIPStorageInterface()
 
-	fmt.Println("\n3. Running Lookup Service Interface Example:")
+	logger.Info("Running Lookup Service Interface Example", slog.String("step", "3"))
 	ExampleLookupServiceInterface()
 
-	fmt.Println("\n4. Running SHIP Usage Example (requires MongoDB):")
+	logger.Info("Running SHIP Usage Example (requires MongoDB)", slog.String("step", "4"))
 	ExampleUsage()
 
-	fmt.Println("\n=== Examples Complete ===")
+	logger.Info("Examples Complete")
 }
 
 // ExampleOutputAdmittedByTopic demonstrates how to call OutputAdmittedByTopic
 // with a properly constructed engine.OutputAdmittedByTopic payload.
 // This shows the expected API structure for SHIP advertisement processing.
 func ExampleOutputAdmittedByTopic(ctx context.Context, lookupService *ship.LookupService) error {
-	fmt.Println("Demonstrating OutputAdmittedByTopic API usage:")
+	logger.Info("Demonstrating OutputAdmittedByTopic API usage")
 
 	// Create a sample transaction ID (32 bytes)
 	sampleTxidHex := "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
@@ -85,12 +89,12 @@ func ExampleOutputAdmittedByTopic(ctx context.Context, lookupService *ship.Looku
 		return fmt.Errorf("OutputAdmittedByTopic failed: %w", err)
 	}
 
-	fmt.Printf("  ✓ Successfully processed SHIP advertisement for outpoint %s:%d\n",
-		sampleTxidHex, outpoint.Index)
-	fmt.Println("  ✓ SHIP record stored with:")
-	fmt.Println("    - Identity Key: deadbeef01020304")
-	fmt.Println("    - Domain: https://example.com")
-	fmt.Println("    - Supported Topic: tm_bridge")
+	logger.Info("Successfully processed SHIP advertisement",
+		slog.String("outpoint", sampleTxidHex),
+		slog.Int("index", int(outpoint.Index)),
+		slog.String("identityKey", "deadbeef01020304"),
+		slog.String("domain", "https://example.com"),
+		slog.String("topic", "tm_bridge"))
 
 	return nil
 }
@@ -109,8 +113,12 @@ func createSampleSHIPScript() (*script.Script, error) {
 	s := &script.Script{}
 
 	// Add public key and OP_CHECKSIG (standard P2PK pattern)
-	s.AppendPushData(pubKeyBytes)
-	s.AppendOpcodes(script.OpCHECKSIG)
+	if err := s.AppendPushData(pubKeyBytes); err != nil {
+		return nil, fmt.Errorf("failed to append public key: %w", err)
+	}
+	if err := s.AppendOpcodes(script.OpCHECKSIG); err != nil {
+		return nil, fmt.Errorf("failed to append OpCHECKSIG: %w", err)
+	}
 
 	// Add SHIP advertisement fields using PushDrop format
 	fields := [][]byte{
@@ -122,17 +130,23 @@ func createSampleSHIPScript() (*script.Script, error) {
 
 	// Add fields to script
 	for _, field := range fields {
-		s.AppendPushData(field)
+		if err := s.AppendPushData(field); err != nil {
+			return nil, fmt.Errorf("failed to append field to script: %w", err)
+		}
 	}
 
 	// Add DROP operations to clean up stack (PushDrop pattern)
 	notYetDropped := len(fields)
 	for notYetDropped > 1 {
-		s.AppendOpcodes(script.Op2DROP)
+		if err := s.AppendOpcodes(script.Op2DROP); err != nil {
+			return nil, fmt.Errorf("failed to append Op2DROP: %w", err)
+		}
 		notYetDropped -= 2
 	}
 	if notYetDropped != 0 {
-		s.AppendOpcodes(script.OpDROP)
+		if err := s.AppendOpcodes(script.OpDROP); err != nil {
+			return nil, fmt.Errorf("failed to append OpDROP: %w", err)
+		}
 	}
 
 	return s, nil
@@ -141,7 +155,7 @@ func createSampleSHIPScript() (*script.Script, error) {
 // ExampleOutputAdmittedByTopicDemo demonstrates the API structure for OutputAdmittedByTopic
 // without requiring actual storage. This shows developers the expected data structures.
 func ExampleOutputAdmittedByTopicDemo() {
-	fmt.Println("OutputAdmittedByTopic API Structure Demo:")
+	logger.Info("OutputAdmittedByTopic API Structure Demo:")
 
 	// Sample transaction ID
 	sampleTxidHex := "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
@@ -171,16 +185,18 @@ func ExampleOutputAdmittedByTopicDemo() {
 		AtomicBEEF:    []byte("sample"),
 	}
 
-	fmt.Printf("  ✓ Payload Topic: %s\n", payload.Topic)
-	fmt.Printf("  ✓ Outpoint: %s:%d\n", sampleTxidHex, payload.Outpoint.Index)
-	fmt.Printf("  ✓ Satoshis: %d\n", payload.Satoshis)
-	fmt.Printf("  ✓ LockingScript: %s\n", lockingScript.String())
-	fmt.Println("  ✓ Expected SHIP fields in script:")
-	fmt.Println("    - Protocol: SHIP")
-	fmt.Println("    - Identity Key: deadbeef01020304")
-	fmt.Println("    - Domain: https://example.com")
-	fmt.Println("    - Topic: tm_bridge")
-	fmt.Println("  ✓ This payload would be created by the overlay engine automatically")
+	logger.Info("OutputAdmittedByTopic API Structure Demo",
+		slog.String("topic", payload.Topic),
+		slog.String("outpoint", sampleTxidHex),
+		slog.Int("index", int(payload.Outpoint.Index)),
+		slog.Uint64("satoshis", payload.Satoshis),
+		slog.String("lockingScript", lockingScript.String()))
+	logger.Info("Expected SHIP fields in script",
+		slog.String("protocol", "SHIP"),
+		slog.String("identityKey", "deadbeef01020304"),
+		slog.String("domain", "https://example.com"),
+		slog.String("topic", "tm_bridge"))
+	logger.Info("This payload would be created by the overlay engine automatically")
 }
 
 // ExampleUsage demonstrates how to use the SHIP lookup service
@@ -191,25 +207,29 @@ func ExampleUsage() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer client.Disconnect(ctx)
+	defer func() {
+		if errDisconnect := client.Disconnect(ctx); errDisconnect != nil {
+			log.Printf("error disconnecting from MongoDB: %v", errDisconnect)
+		}
+	}()
 
 	// 2. Create SHIP storage
 	db := client.Database("overlay_services")
 	storage := ship.NewStorage(db)
 
 	// Ensure indexes are created
-	if err := storage.EnsureIndexes(ctx); err != nil {
-		log.Fatal("Failed to ensure indexes:", err)
+	if errIndex := storage.EnsureIndexes(ctx); errIndex != nil {
+		log.Fatal("Failed to ensure indexes:", errIndex)
 	}
 
 	// 3. Create the SHIP lookup service
 	lookupService := ship.NewLookupService(storage)
 
 	// 4. Example: Handle an output admitted by topic
-	// Note: This demonstrates the API structure. In production, the overlay engine
+	// This demonstrates the API structure. In production, the overlay engine
 	// would call this method automatically when SHIP-related outputs are detected.
-	if err := ExampleOutputAdmittedByTopic(ctx, lookupService); err != nil {
-		log.Printf("OutputAdmittedByTopic example failed: %v", err)
+	if errOutput := ExampleOutputAdmittedByTopic(ctx, lookupService); errOutput != nil {
+		log.Printf("OutputAdmittedByTopic example failed: %v", errOutput)
 	}
 
 	// 6. Example: Perform lookup queries
@@ -225,9 +245,9 @@ func ExampleUsage() {
 		log.Printf("Legacy lookup failed: %v", err)
 	} else {
 		if utxos, ok := results.Result.([]types.UTXOReference); ok {
-			fmt.Printf("Found %d SHIP records\n", len(utxos))
+			logger.Info("Found SHIP records", "count", len(utxos))
 		} else {
-			fmt.Printf("Found SHIP records (unknown format)\n")
+			logger.Info("Found SHIP records (unknown format)")
 		}
 	}
 
@@ -239,7 +259,11 @@ func ExampleUsage() {
 		"limit":  10,
 	}
 
-	modernQueryJSON, _ := json.Marshal(modernQuery)
+	modernQueryJSON, err := json.Marshal(modernQuery)
+	if err != nil {
+		log.Printf("Failed to marshal modernQuery: %v", err)
+		return
+	}
 	modernQuestion := &lookup.LookupQuestion{
 		Service: "ls_ship",
 		Query:   modernQueryJSON,
@@ -250,27 +274,27 @@ func ExampleUsage() {
 		log.Printf("Modern lookup failed: %v", err)
 	} else {
 		if utxos, ok := results.Result.([]types.UTXOReference); ok {
-			fmt.Printf("Found %d SHIP records for domain %s\n", len(utxos), domain)
+			logger.Info("Found SHIP records for domain", "count", len(utxos), "domain", domain)
 			for _, result := range utxos {
-				fmt.Printf("  - UTXO: %s:%d\n", result.Txid, result.OutputIndex)
+				logger.Info("UTXO", "txid", result.Txid, "index", result.OutputIndex)
 			}
 		} else {
-			fmt.Printf("Found SHIP records for domain %s (unknown format)\n", domain)
+			logger.Info("Found SHIP records for domain (unknown format)", "domain", domain)
 		}
 	}
 
 	// 7. Example: Get service metadata and documentation
 	metadata := lookupService.GetMetaData()
-	fmt.Printf("Service: %s - %s\n", metadata.Name, metadata.Description)
+	logger.Info("Service metadata", "name", metadata.Name, "description", metadata.Description)
 
 	documentation := lookupService.GetDocumentation()
-	fmt.Printf("Documentation length: %d characters\n", len(documentation))
+	logger.Info("Documentation", "length", len(documentation))
 
 	// 8. Example: Handle spent output
-	// Note: This demonstrates the API structure. In production, the overlay engine
+	// This demonstrates the API structure. In production, the overlay engine
 	// would call this method automatically when SHIP-related outputs are spent.
-	if err := ExampleOutputSpent(ctx, lookupService); err != nil {
-		log.Printf("OutputSpent example failed: %v", err)
+	if errSpent := ExampleOutputSpent(ctx, lookupService); errSpent != nil {
+		log.Printf("OutputSpent example failed: %v", errSpent)
 	}
 }
 
@@ -278,7 +302,7 @@ func ExampleUsage() {
 // with a properly constructed engine.OutputSpent payload.
 // This shows the expected API structure for SHIP output spending.
 func ExampleOutputSpent(ctx context.Context, lookupService *ship.LookupService) error {
-	fmt.Println("Demonstrating OutputSpent API usage:")
+	logger.Info("Demonstrating OutputSpent API usage:")
 
 	// Create a sample transaction ID (32 bytes) - same as the admitted output
 	sampleTxidHex := "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
@@ -312,8 +336,12 @@ func ExampleOutputSpent(ctx context.Context, lookupService *ship.LookupService) 
 
 	// Create a sample unlocking script
 	unlockingScript := &script.Script{}
-	unlockingScript.AppendPushData([]byte{0x30, 0x44}) // Sample signature
-	unlockingScript.AppendPushData([]byte{0x21, 0x02}) // Sample pubkey
+	if errAppend := unlockingScript.AppendPushData([]byte{0x30, 0x44}); errAppend != nil {
+		log.Fatal("failed to append signature to unlocking script:", errAppend)
+	}
+	if errAppend := unlockingScript.AppendPushData([]byte{0x21, 0x02}); errAppend != nil {
+		log.Fatal("failed to append pubkey to unlocking script:", errAppend)
+	}
 
 	// Construct the OutputSpent payload
 	// This structure would normally be created by the overlay engine
@@ -331,12 +359,10 @@ func ExampleOutputSpent(ctx context.Context, lookupService *ship.LookupService) 
 		return fmt.Errorf("OutputSpent failed: %w", err)
 	}
 
-	fmt.Printf("  ✓ Successfully processed spent SHIP output for outpoint %s:%d\n",
-		sampleTxidHex, outpoint.Index)
-	fmt.Printf("  ✓ Spent by transaction: %s (input %d)\n",
-		spendingTxidHex, payload.InputIndex)
-	fmt.Println("  ✓ SHIP record removed from storage")
-	fmt.Println("  ✓ Discovery service no longer advertises this host/topic combination")
+	logger.Info("Successfully processed spent SHIP output", "outpoint", sampleTxidHex, "index", outpoint.Index)
+	logger.Info("Spent by transaction", "txid", spendingTxidHex, "input", payload.InputIndex)
+	logger.Info("SHIP record removed from storage")
+	logger.Info("Discovery service no longer advertises this host/topic combination")
 
 	return nil
 }
@@ -346,7 +372,7 @@ func ExampleSHIPStorageInterface() {
 	// This example shows that SHIPStorage implements SHIPStorageInterface
 	var _ ship.StorageInterface = &ship.Storage{}
 
-	fmt.Println("SHIPStorage successfully implements SHIPStorageInterface")
+	logger.Info("SHIPStorage successfully implements SHIPStorageInterface")
 }
 
 // ExampleLookupServiceInterface demonstrates how SHIPLookupService implements the BSV overlay interface
@@ -354,5 +380,5 @@ func ExampleLookupServiceInterface() {
 	// This example shows that LookupService implements types.LookupService
 	var _ engine.LookupService = &ship.LookupService{}
 
-	fmt.Println("LookupService successfully implements types.LookupService")
+	logger.Info("LookupService successfully implements types.LookupService")
 }

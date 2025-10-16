@@ -1,5 +1,7 @@
 // Package types defines the core data structures and interfaces for the BSV Overlay Discovery Services.
 // enabling interaction with SHIP (Service Host Interconnect Protocol) and SLAP (Service Lookup Availability Protocol) systems.
+//
+//nolint:revive // Package name is descriptive in context
 package types
 
 import (

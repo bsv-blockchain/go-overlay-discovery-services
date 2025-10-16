@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 
@@ -26,6 +27,22 @@ const (
 	Service = "ls_ship"
 	// Identifier is the protocol identifier expected in PushDrop fields
 	Identifier = "SHIP"
+)
+
+// Static error variables for err113 compliance
+var (
+	errPushDropDecodeFailed      = errors.New("failed to decode PushDrop locking script")
+	errInvalidPushDropFields     = errors.New("invalid PushDrop result: expected at least 4 fields")
+	errValidQueryMustBeProvided  = errors.New("a valid query must be provided")
+	errLookupServiceNotSupported = errors.New("lookup service not supported")
+	errInvalidStringQuery        = errors.New("invalid string query: only 'findAll' is supported")
+	errQueryDomainInvalid        = errors.New("query.domain must be a string if provided")
+	errQueryTopicsInvalid        = errors.New("query.topics must be an array of strings if provided")
+	errQueryTopicElementInvalid  = errors.New("query.topics element must be a string")
+	errQueryIdentityKeyInvalid   = errors.New("query.identityKey must be a string if provided")
+	errQueryLimitInvalid         = errors.New("query.limit must be a positive number if provided")
+	errQuerySkipInvalid          = errors.New("query.skip must be a non-negative number if provided")
+	errQuerySortOrderInvalid     = errors.New("query.sortOrder must be 'asc' or 'desc' if provided")
 )
 
 // LookupService implements the BSV overlay LookupService interface for SHIP protocol.
@@ -67,12 +84,12 @@ func (s *LookupService) OutputAdmittedByTopic(ctx context.Context, payload *engi
 	// Decode the PushDrop locking script
 	result := pushdrop.Decode(scriptObj)
 	if result == nil {
-		return fmt.Errorf("failed to decode PushDrop locking script")
+		return errPushDropDecodeFailed
 	}
 
 	// Validate that we have the expected number of fields
 	if len(result.Fields) < 4 {
-		return fmt.Errorf("invalid PushDrop result: expected at least 4 fields, got %d", len(result.Fields))
+		return fmt.Errorf("%w: got %d", errInvalidPushDropFields, len(result.Fields))
 	}
 
 	// Extract and validate fields
@@ -114,7 +131,7 @@ func (s *LookupService) OutputEvicted(ctx context.Context, outpoint *transaction
 // OutputNoLongerRetainedInHistory handles outputs no longer retained in history.
 // Called when a Topic Manager decides that historical retention of the specified UTXO is no longer required.
 // For SHIP discovery services, this is typically a no-op as they don't maintain historical retention.
-func (s *LookupService) OutputNoLongerRetainedInHistory(ctx context.Context, outpoint *transaction.Outpoint, topic string) error {
+func (s *LookupService) OutputNoLongerRetainedInHistory(_ context.Context, _ *transaction.Outpoint, _ string) error {
 	// Discovery services don't have the concept of historical retention, so we ignore it
 	return nil
 }
@@ -122,7 +139,7 @@ func (s *LookupService) OutputNoLongerRetainedInHistory(ctx context.Context, out
 // OutputBlockHeightUpdated handles block height updates for transactions.
 // Called when the block height of a transaction is updated (e.g., when a transaction is included in a block).
 // For SHIP discovery services, this is typically a no-op as they don't track block heights.
-func (s *LookupService) OutputBlockHeightUpdated(ctx context.Context, txid *chainhash.Hash, blockHeight uint32, blockIndex uint64) error {
+func (s *LookupService) OutputBlockHeightUpdated(_ context.Context, _ *chainhash.Hash, _ uint32, _ uint64) error {
 	// Discovery services don't handle block height updates, so we ignore it
 	return nil
 }
@@ -137,11 +154,11 @@ func (s *LookupService) OutputBlockHeightUpdated(ctx context.Context, txid *chai
 func (s *LookupService) Lookup(ctx context.Context, question *lookup.LookupQuestion) (*lookup.LookupAnswer, error) {
 	// Validate required fields
 	if len(question.Query) == 0 {
-		return nil, fmt.Errorf("a valid query must be provided")
+		return nil, errValidQueryMustBeProvided
 	}
 
 	if question.Service != Service {
-		return nil, fmt.Errorf("lookup service not supported: expected '%s', got '%s'", Service, question.Service)
+		return nil, fmt.Errorf("%w: expected '%s', got '%s'", errLookupServiceNotSupported, Service, question.Service)
 	}
 
 	// Parse the query from JSON
@@ -159,7 +176,7 @@ func (s *LookupService) Lookup(ctx context.Context, question *lookup.LookupQuest
 			}
 			return s.convertUTXOsToLookupAnswer(utxos), nil
 		}
-		return nil, fmt.Errorf("invalid string query: only 'findAll' is supported, got '%s'", queryStr)
+		return nil, fmt.Errorf("%w: got '%s'", errInvalidStringQuery, queryStr)
 	}
 
 	// Handle object-based query
@@ -211,18 +228,18 @@ func (s *LookupService) validateQuery(query *types.SHIPQuery) error {
 	if query.Domain != nil {
 		if reflect.TypeOf(query.Domain).Kind() != reflect.Ptr ||
 			reflect.TypeOf(query.Domain).Elem().Kind() != reflect.String {
-			return fmt.Errorf("query.domain must be a string if provided")
+			return errQueryDomainInvalid
 		}
 	}
 
 	// Validate topics parameter
 	if query.Topics != nil {
 		if reflect.TypeOf(query.Topics).Kind() != reflect.Slice {
-			return fmt.Errorf("query.topics must be an array of strings if provided")
+			return errQueryTopicsInvalid
 		}
 		for i, topic := range query.Topics {
 			if reflect.TypeOf(topic).Kind() != reflect.String {
-				return fmt.Errorf("query.topics[%d] must be a string", i)
+				return fmt.Errorf("%w: at index %d", errQueryTopicElementInvalid, i)
 			}
 		}
 	}
@@ -231,27 +248,27 @@ func (s *LookupService) validateQuery(query *types.SHIPQuery) error {
 	if query.IdentityKey != nil {
 		if reflect.TypeOf(query.IdentityKey).Kind() != reflect.Ptr ||
 			reflect.TypeOf(query.IdentityKey).Elem().Kind() != reflect.String {
-			return fmt.Errorf("query.identityKey must be a string if provided")
+			return errQueryIdentityKeyInvalid
 		}
 	}
 
 	// Validate pagination parameters
 	if query.Limit != nil {
 		if *query.Limit < 0 {
-			return fmt.Errorf("query.limit must be a positive number if provided")
+			return errQueryLimitInvalid
 		}
 	}
 
 	if query.Skip != nil {
 		if *query.Skip < 0 {
-			return fmt.Errorf("query.skip must be a non-negative number if provided")
+			return errQuerySkipInvalid
 		}
 	}
 
 	// Validate sort order parameter
 	if query.SortOrder != nil {
 		if *query.SortOrder != types.SortOrderAsc && *query.SortOrder != types.SortOrderDesc {
-			return fmt.Errorf("query.sortOrder must be 'asc' or 'desc' if provided")
+			return errQuerySortOrderInvalid
 		}
 	}
 

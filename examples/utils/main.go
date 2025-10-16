@@ -3,18 +3,21 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
+	"log/slog"
+	"os"
 
 	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/utils"
 )
 
+//nolint:gochecknoglobals // logger is used across multiple example functions
+var logger = slog.New(slog.NewTextHandler(os.Stdout, nil))
+
 func main() {
-	fmt.Println("=== Overlay Discovery Services Utility Examples ===")
-	fmt.Println()
+	logger.Info("=== Overlay Discovery Services Utility Examples ===")
 
 	// Example 1: URI validation
-	fmt.Println("1. URI Validation Examples:")
+	logger.Info("1. URI Validation Examples:")
 	testURIs := []string{
 		"https://example.com/",
 		"https://localhost/",
@@ -26,15 +29,15 @@ func main() {
 
 	for _, uri := range testURIs {
 		isValid := utils.IsAdvertisableURI(uri)
-		status := "✓ Valid"
+		status := "Valid"
 		if !isValid {
-			status = "✗ Invalid"
+			status = "Invalid"
 		}
-		fmt.Printf("  %s: %s\n", status, uri)
+		logger.Info("URI validation result", "status", status, "uri", uri)
 	}
 
 	// Example 2: Topic/Service name validation
-	fmt.Println("\n2. Topic/Service Name Validation Examples:")
+	logger.Info("2. Topic/Service Name Validation Examples:")
 	testNames := []string{
 		"tm_payments",
 		"ls_identity_verification",
@@ -47,30 +50,30 @@ func main() {
 
 	for _, name := range testNames {
 		isValid := utils.IsValidTopicOrServiceName(name)
-		status := "✓ Valid"
+		status := "Valid"
 		if !isValid {
-			status = "✗ Invalid"
+			status = "Invalid"
 		}
-		fmt.Printf("  %s: %s\n", status, name)
+		logger.Info("Topic/Service name validation result", "status", status, "name", name)
 	}
 
 	// Example 3: Helper functions
-	fmt.Println("\n3. Helper Function Examples:")
+	logger.Info("3. Helper Function Examples:")
 
 	// Hex conversion examples
 	testBytes := []byte{0x01, 0x23, 0xab, 0xcd}
 	hexString := utils.BytesToHex(testBytes)
-	fmt.Printf("  Bytes to Hex: %v -> %s\n", testBytes, hexString)
+	logger.Info("Bytes to Hex conversion", "bytes", testBytes, "hex", hexString)
 
 	backToBytes, err := utils.HexToBytes(hexString)
 	if err != nil {
 		log.Printf("Error converting hex to bytes: %v", err)
 	} else {
-		fmt.Printf("  Hex to Bytes: %s -> %v\n", hexString, backToBytes)
+		logger.Info("Hex to Bytes conversion", "hex", hexString, "bytes", backToBytes)
 	}
 
 	// Example 4: Token signature validation (with mock wallet)
-	fmt.Println("\n4. Token Signature Validation Example (Mock):")
+	logger.Info("4. Token Signature Validation Example (Mock):")
 
 	// Create mock token fields for demonstration
 	protocol := []byte("SHIP")
@@ -89,16 +92,16 @@ func main() {
 
 	isValid, err := utils.IsTokenSignatureCorrectlyLinked(context.TODO(), lockingPubKey, tokenFields)
 	if err != nil {
-		fmt.Printf("  Token validation error (expected with mock wallet): %v\n", err)
+		logger.Info("Token validation error (expected with mock wallet)", "error", err)
 	} else {
-		status := "✗ Invalid"
+		status := "Invalid"
 		if isValid {
-			status = "✓ Valid"
+			status = "Valid"
 		}
-		fmt.Printf("  Token signature validation: %s\n", status)
+		logger.Info("Token signature validation result", "status", status)
 	}
 
-	fmt.Println("\n=== Example Complete ===")
-	fmt.Println("Note: Token signature validation requires a real BSV SDK wallet implementation.")
-	fmt.Println("The MockWallet is provided for testing and will always return errors.")
+	logger.Info("=== Example Complete ===")
+	logger.Info("Note: Token signature validation requires a real BSV SDK wallet implementation.")
+	logger.Info("The MockWallet is provided for testing and will always return errors.")
 }

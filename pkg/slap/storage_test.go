@@ -37,12 +37,12 @@ func NewTestSLAPStorage() *TestSLAPStorage {
 }
 
 // EnsureIndexes mock implementation
-func (s *TestSLAPStorage) EnsureIndexes(ctx context.Context) error {
+func (s *TestSLAPStorage) EnsureIndexes(_ context.Context) error {
 	return nil
 }
 
 // StoreSLAPRecord mock implementation
-func (s *TestSLAPStorage) StoreSLAPRecord(ctx context.Context, txid string, outputIndex int, identityKey, domain, service string) error {
+func (s *TestSLAPStorage) StoreSLAPRecord(_ context.Context, txid string, outputIndex int, identityKey, domain, service string) error {
 	record := types.SLAPRecord{
 		Txid:        txid,
 		OutputIndex: outputIndex,
@@ -55,7 +55,7 @@ func (s *TestSLAPStorage) StoreSLAPRecord(ctx context.Context, txid string, outp
 }
 
 // DeleteSLAPRecord mock implementation
-func (s *TestSLAPStorage) DeleteSLAPRecord(ctx context.Context, txid string, outputIndex int) error {
+func (s *TestSLAPStorage) DeleteSLAPRecord(_ context.Context, txid string, outputIndex int) error {
 	for i, record := range s.records {
 		if record.Txid == txid && record.OutputIndex == outputIndex {
 			s.records = append(s.records[:i], s.records[i+1:]...)
@@ -66,7 +66,7 @@ func (s *TestSLAPStorage) DeleteSLAPRecord(ctx context.Context, txid string, out
 }
 
 // FindRecord mock implementation
-func (s *TestSLAPStorage) FindRecord(ctx context.Context, query types.SLAPQuery) ([]types.UTXOReference, error) {
+func (s *TestSLAPStorage) FindRecord(_ context.Context, query types.SLAPQuery) ([]types.UTXOReference, error) {
 	var results []types.UTXOReference
 
 	for _, record := range s.records {
@@ -111,8 +111,8 @@ func (s *TestSLAPStorage) FindRecord(ctx context.Context, query types.SLAPQuery)
 }
 
 // FindAll mock implementation
-func (s *TestSLAPStorage) FindAll(ctx context.Context, limit, skip *int, sortOrder *types.SortOrder) ([]types.UTXOReference, error) {
-	var results []types.UTXOReference
+func (s *TestSLAPStorage) FindAll(_ context.Context, limit, skip *int, _ *types.SortOrder) ([]types.UTXOReference, error) {
+	results := make([]types.UTXOReference, 0, len(s.records))
 
 	for _, record := range s.records {
 		results = append(results, types.UTXOReference{
@@ -147,7 +147,7 @@ func TestNewSLAPStorage(t *testing.T) {
 func TestEnsureIndexes(t *testing.T) {
 	storage := NewTestSLAPStorage()
 	err := storage.EnsureIndexes(context.Background())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 // TestStoreSLAPRecord tests the record storage functionality
@@ -155,7 +155,7 @@ func TestStoreSLAPRecord(t *testing.T) {
 	storage := NewTestSLAPStorage()
 
 	err := storage.StoreSLAPRecord(context.Background(), "test-txid-123", 0, "test-identity-key", "example.com", "lookup-service")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Verify the record was stored
 	assert.Len(t, storage.records, 1)
@@ -179,10 +179,10 @@ func TestDeleteSLAPRecord(t *testing.T) {
 
 	// Delete the record
 	err = storage.DeleteSLAPRecord(context.Background(), "test-txid-123", 0)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Verify it was deleted
-	assert.Len(t, storage.records, 0)
+	assert.Empty(t, storage.records)
 }
 
 // TestFindRecord tests the record finding functionality with various query parameters
@@ -285,7 +285,7 @@ func TestFindRecord(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			results, err := storage.FindRecord(context.Background(), tt.query)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Len(t, results, tt.expectedCount)
 
 			if len(tt.expectedTxids) > 0 {
@@ -360,7 +360,7 @@ func TestFindAll(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			results, err := storage.FindAll(context.Background(), tt.limit, tt.skip, tt.sortOrder)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Len(t, results, tt.expectedCount)
 		})
 	}
@@ -372,20 +372,20 @@ func TestEdgeCases(t *testing.T) {
 
 	t.Run("empty query parameters", func(t *testing.T) {
 		results, err := storage.FindRecord(context.Background(), types.SLAPQuery{})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Empty(t, results)
 	})
 
 	t.Run("delete non-existent record", func(t *testing.T) {
 		err := storage.DeleteSLAPRecord(context.Background(), "non-existent", 0)
-		assert.NoError(t, err) // Should not error even if record doesn't exist
+		require.NoError(t, err) // Should not error even if record doesn't exist
 	})
 
 	t.Run("find with nil service", func(t *testing.T) {
 		results, err := storage.FindRecord(context.Background(), types.SLAPQuery{
 			Service: nil,
 		})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Empty(t, results)
 	})
 }
@@ -419,7 +419,7 @@ func TestQueryLogicConsistency(t *testing.T) {
 		results, err := storage.FindRecord(context.Background(), types.SLAPQuery{
 			Domain: stringPtr("example.com"),
 		})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Len(t, results, 3)
 	})
 
@@ -427,7 +427,7 @@ func TestQueryLogicConsistency(t *testing.T) {
 		results, err := storage.FindRecord(context.Background(), types.SLAPQuery{
 			Service: stringPtr("directory"),
 		})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Len(t, results, 2) // tx1, tx3
 	})
 
@@ -435,7 +435,7 @@ func TestQueryLogicConsistency(t *testing.T) {
 		results, err := storage.FindRecord(context.Background(), types.SLAPQuery{
 			IdentityKey: stringPtr("alice"),
 		})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Len(t, results, 2) // tx1, tx3
 	})
 
@@ -445,7 +445,7 @@ func TestQueryLogicConsistency(t *testing.T) {
 			Service:     stringPtr("directory"),
 			IdentityKey: stringPtr("alice"),
 		})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Len(t, results, 1) // only tx1
 		assert.Equal(t, "tx1", results[0].Txid)
 	})
@@ -480,7 +480,7 @@ func TestSLAPSpecificDifferences(t *testing.T) {
 		results, err := storage.FindRecord(context.Background(), types.SLAPQuery{
 			Service: stringPtr("directory"),
 		})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Len(t, results, 1)
 		assert.Equal(t, "tx1", results[0].Txid)
 	})
@@ -489,19 +489,19 @@ func TestSLAPSpecificDifferences(t *testing.T) {
 		directoryResults, err := storage.FindRecord(context.Background(), types.SLAPQuery{
 			Service: stringPtr("directory"),
 		})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Len(t, directoryResults, 1)
 
 		lookupResults, err := storage.FindRecord(context.Background(), types.SLAPQuery{
 			Service: stringPtr("lookup"),
 		})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Len(t, lookupResults, 1)
 
 		searchResults, err := storage.FindRecord(context.Background(), types.SLAPQuery{
 			Service: stringPtr("search"),
 		})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Len(t, searchResults, 1)
 
 		// Verify they're all different records

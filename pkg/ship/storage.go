@@ -14,6 +14,7 @@ import (
 	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
 )
 
+// StorageInterface defines the interface for SHIP storage operations.
 type StorageInterface interface {
 	StoreSHIPRecord(ctx context.Context, txid string, outputIndex int, identityKey, domain, topic string) error
 	DeleteSHIPRecord(ctx context.Context, txid string, outputIndex int) error
@@ -30,7 +31,7 @@ type Storage struct {
 	shipRecords *mongo.Collection
 }
 
-// Note: Compile-time verification that Storage implements SHIPStorageInterface
+// Compile-time verification that Storage implements SHIPStorageInterface
 // is performed in lookup_service.go to avoid circular dependencies
 
 // NewStorage constructs a new Storage instance with the provided MongoDB database.
@@ -150,7 +151,9 @@ func (s *Storage) FindRecord(ctx context.Context, query types.SHIPQuery) ([]type
 	if err != nil {
 		return nil, fmt.Errorf("failed to find SHIP records: %w", err)
 	}
-	defer cursor.Close(ctx)
+	defer func() {
+		_ = cursor.Close(ctx)
+	}()
 
 	// Collect results
 	var results []types.UTXOReference
@@ -212,7 +215,9 @@ func (s *Storage) FindAll(ctx context.Context, limit, skip *int, sortOrder *type
 	if err != nil {
 		return nil, fmt.Errorf("failed to find all SHIP records: %w", err)
 	}
-	defer cursor.Close(ctx)
+	defer func() {
+		_ = cursor.Close(ctx)
+	}()
 
 	// Collect results
 	var results []types.UTXOReference

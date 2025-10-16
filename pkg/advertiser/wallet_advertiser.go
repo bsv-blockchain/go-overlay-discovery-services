@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -33,8 +34,42 @@ import (
 	"github.com/bsv-blockchain/go-wallet-toolbox/pkg/wdk"
 )
 
+// AdTokenValue is the default token value used for advertisements.
 const AdTokenValue = 1
 
+// Static error variables for err113 compliance
+var (
+	errChainRequired                 = errors.New("chain parameter is required and cannot be empty")
+	errPrivateKeyRequired            = errors.New("privateKey parameter is required and cannot be empty")
+	errStorageURLRequired            = errors.New("storageURL parameter is required and cannot be empty")
+	errAdvertisableURIRequired       = errors.New("advertisableURI parameter is required and cannot be empty")
+	errAdvertisableURIInvalid        = errors.New("advertisableURI is not valid according to BRC-101 specification")
+	errStorageURLInvalid             = errors.New("storageURL must be a valid HTTP or HTTPS URL")
+	errAlreadyInitialized            = errors.New("WalletAdvertiser is already initialized")
+	errNotInitializedForAds          = errors.New("WalletAdvertiser must be initialized before creating advertisements")
+	errNotInitializedForFind         = errors.New("WalletAdvertiser must be initialized before finding advertisements")
+	errNotInitializedForParse        = errors.New("WalletAdvertiser must be initialized before parsing advertisements")
+	errNotInitializedForRevoke       = errors.New("WalletAdvertiser must be initialized before revoking advertisements")
+	errNoAdvertisementData           = errors.New("at least one advertisement data entry is required")
+	errNoAdvertisements              = errors.New("at least one advertisement is required for revocation")
+	errInvalidTopicOrServiceName     = errors.New("invalid topic or service name")
+	errUnsupportedProtocol           = errors.New("unsupported protocol: must be 'SHIP' or 'SLAP'")
+	errMissingBeefData               = errors.New("is missing BEEF data required for revocation")
+	errMissingOutputIndex            = errors.New("is missing output index required for revocation")
+	errOutputScriptEmpty             = errors.New("output script cannot be empty")
+	errInvalidPushDropScript         = errors.New("failed to decode PushDrop script")
+	errInvalidPushDropFields         = errors.New("invalid PushDrop result: expected at least 4 fields")
+	errUnsupportedProtocolID         = errors.New("unsupported protocol identifier")
+	errPrivateKeyAllZeros            = errors.New("private key cannot be all zeros")
+	errPrivateKeyInsufficientLength  = errors.New("private key must be exactly 32 bytes (64 hex characters)")
+	errPrivateKeyInsufficientEntropy = errors.New("private key appears to have insufficient entropy")
+	errBEEFTooShort                  = errors.New("BEEF data too short")
+	errTransactionTooShort           = errors.New("transaction data too short")
+	errTopicNameEmpty                = errors.New("topicOrServiceName cannot be empty")
+	errStorageServerError            = errors.New("storage service returned server error")
+)
+
+// Finder defines the interface for finding and creating advertisements.
 type Finder interface {
 	Advertisements(protocol overlay.Protocol) ([]*oa.Advertisement, error)
 	CreateAdvertisements(adsData []*oa.AdvertisementData, identityKey, advertisableURI string) (overlay.TaggedBEEF, error)
@@ -77,16 +112,16 @@ var _ oa.Advertiser = (*WalletAdvertiser)(nil)
 func NewWalletAdvertiser(chain, privateKey, storageURL, advertisableURI string, lookupResolverConfig *types.LookupResolverConfig) (*WalletAdvertiser, error) {
 	// Validate required parameters
 	if strings.TrimSpace(chain) == "" {
-		return nil, fmt.Errorf("chain parameter is required and cannot be empty")
+		return nil, errChainRequired
 	}
 	if strings.TrimSpace(privateKey) == "" {
-		return nil, fmt.Errorf("privateKey parameter is required and cannot be empty")
+		return nil, errPrivateKeyRequired
 	}
 	if strings.TrimSpace(storageURL) == "" {
-		return nil, fmt.Errorf("storageURL parameter is required and cannot be empty")
+		return nil, errStorageURLRequired
 	}
 	if strings.TrimSpace(advertisableURI) == "" {
-		return nil, fmt.Errorf("advertisableURI parameter is required and cannot be empty")
+		return nil, errAdvertisableURIRequired
 	}
 
 	// Validate private key format (should be hex)
@@ -96,12 +131,12 @@ func NewWalletAdvertiser(chain, privateKey, storageURL, advertisableURI string, 
 
 	// Validate advertisable URI
 	if !utils.IsAdvertisableURI(advertisableURI) {
-		return nil, fmt.Errorf("advertisableURI is not valid according to BRC-101 specification: %s", advertisableURI)
+		return nil, fmt.Errorf("%w: %s", errAdvertisableURIInvalid, advertisableURI)
 	}
 
 	// Validate storage URL (basic URL validation)
 	if !strings.HasPrefix(storageURL, "http://") && !strings.HasPrefix(storageURL, "https://") {
-		return nil, fmt.Errorf("storageURL must be a valid HTTP or HTTPS URL: %s", storageURL)
+		return nil, fmt.Errorf("%w: %s", errStorageURLInvalid, storageURL)
 	}
 
 	// Create private key object for wallet initialization
@@ -116,7 +151,7 @@ func NewWalletAdvertiser(chain, privateKey, storageURL, advertisableURI string, 
 	activeServices := services.New(slog.Default(), cfg.Services)
 
 	// Create storage manager for the wallet
-	storageManager, err := storage.NewGORMProvider(context.TODO(), slog.Default(), storage.GORMProviderConfig{
+	storageManager, errStorage := storage.NewGORMProvider(context.TODO(), slog.Default(), storage.GORMProviderConfig{
 		DB:                    cfg.DBConfig,
 		Chain:                 cfg.BSVNetwork,
 		FeeModel:              cfg.FeeModel,
@@ -124,19 +159,19 @@ func NewWalletAdvertiser(chain, privateKey, storageURL, advertisableURI string, 
 		Services:              activeServices,
 		SynchronizeTxStatuses: cfg.SynchronizeTxStatuses,
 	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create storage manager: %w", err)
+	if errStorage != nil {
+		return nil, fmt.Errorf("failed to create storage manager: %w", errStorage)
 	}
 
 	// Get storage identity key
-	storageIdentityKey, err := wdk.IdentityKey(cfg.ServerPrivateKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create storage identity key: %w", err)
+	storageIdentityKey, errKey := wdk.IdentityKey(cfg.ServerPrivateKey)
+	if errKey != nil {
+		return nil, fmt.Errorf("failed to create storage identity key: %w", errKey)
 	}
 
 	// Migrate storage
-	if _, err := storageManager.Migrate(context.TODO(), "wallet-advertiser", storageIdentityKey); err != nil {
-		return nil, fmt.Errorf("failed to migrate storage: %w", err)
+	if _, errMigrate := storageManager.Migrate(context.TODO(), "wallet-advertiser", storageIdentityKey); errMigrate != nil {
+		return nil, fmt.Errorf("failed to migrate storage: %w", errMigrate)
 	}
 
 	// Determine the network based on chain parameter
@@ -184,7 +219,7 @@ func (w *WalletAdvertiser) SetTestMode(testMode bool) {
 // This method must be called before using any other advertiser functionality.
 func (w *WalletAdvertiser) Init() error {
 	if w.initialized {
-		return fmt.Errorf("WalletAdvertiser is already initialized")
+		return errAlreadyInitialized
 	}
 
 	// Initialize wallet connection and verify private key
@@ -219,11 +254,11 @@ func (w *WalletAdvertiser) Init() error {
 // This method supports both SHIP and SLAP protocol advertisements.
 func (w *WalletAdvertiser) CreateAdvertisements(adsData []*oa.AdvertisementData) (overlay.TaggedBEEF, error) {
 	if !w.initialized {
-		return overlay.TaggedBEEF{}, fmt.Errorf("WalletAdvertiser must be initialized before creating advertisements")
+		return overlay.TaggedBEEF{}, errNotInitializedForAds
 	}
 
 	if len(adsData) == 0 {
-		return overlay.TaggedBEEF{}, fmt.Errorf("at least one advertisement data entry is required")
+		return overlay.TaggedBEEF{}, errNoAdvertisementData
 	}
 
 	// Validate all advertisement data entries
@@ -241,9 +276,8 @@ func (w *WalletAdvertiser) CreateAdvertisements(adsData []*oa.AdvertisementData)
 	// Collect topics for the TaggedBEEF
 	var topics []string
 	for _, adData := range adsData {
-		if adData.Protocol == overlay.ProtocolSHIP {
-			topics = append(topics, "tm_"+adData.TopicOrServiceName)
-		} else if adData.Protocol == overlay.ProtocolSLAP {
+		switch adData.Protocol {
+		case overlay.ProtocolSHIP, overlay.ProtocolSLAP:
 			topics = append(topics, "tm_"+adData.TopicOrServiceName)
 		}
 	}
@@ -257,7 +291,7 @@ func (w *WalletAdvertiser) CreateAdvertisements(adsData []*oa.AdvertisementData)
 	cfg.ServerPrivateKey = w.privateKey
 	activeServices := services.New(logger, cfg.Services)
 
-	storageManager, err := storage.NewGORMProvider(context.TODO(), logger, storage.GORMProviderConfig{
+	storageManager, errStorage := storage.NewGORMProvider(context.TODO(), logger, storage.GORMProviderConfig{
 		DB:                    cfg.DBConfig,
 		Chain:                 cfg.BSVNetwork,
 		FeeModel:              cfg.FeeModel,
@@ -265,19 +299,22 @@ func (w *WalletAdvertiser) CreateAdvertisements(adsData []*oa.AdvertisementData)
 		Services:              activeServices,
 		SynchronizeTxStatuses: cfg.SynchronizeTxStatuses,
 	})
-
-	storageIdentityKey, err := wdk.IdentityKey(cfg.ServerPrivateKey)
-	if err != nil {
-		return overlay.TaggedBEEF{}, fmt.Errorf("failed to create storage identity key: %w", err)
+	if errStorage != nil {
+		return overlay.TaggedBEEF{}, fmt.Errorf("failed to create storage provider: %w", errStorage)
 	}
 
-	if _, err := storageManager.Migrate(context.TODO(), cfg.Name, storageIdentityKey); err != nil {
-		return overlay.TaggedBEEF{}, fmt.Errorf("failed to migrate storage: %w", err)
+	storageIdentityKey, errKey := wdk.IdentityKey(cfg.ServerPrivateKey)
+	if errKey != nil {
+		return overlay.TaggedBEEF{}, fmt.Errorf("failed to create storage identity key: %w", errKey)
 	}
 
-	wlt, err := toolboxWallet.New(defs.NetworkMainnet, privKey, storageManager)
-	if err != nil {
-		return overlay.TaggedBEEF{}, fmt.Errorf("failed to create wallet: %w", err)
+	if _, errMigrate := storageManager.Migrate(context.TODO(), cfg.Name, storageIdentityKey); errMigrate != nil {
+		return overlay.TaggedBEEF{}, fmt.Errorf("failed to migrate storage: %w", errMigrate)
+	}
+
+	wlt, errWallet := toolboxWallet.New(defs.NetworkMainnet, privKey, storageManager)
+	if errWallet != nil {
+		return overlay.TaggedBEEF{}, fmt.Errorf("failed to create wallet: %w", errWallet)
 	}
 	keyDeriver := wallet.NewKeyDeriver(privKey)
 
@@ -285,16 +322,16 @@ func (w *WalletAdvertiser) CreateAdvertisements(adsData []*oa.AdvertisementData)
 		Wallet: wlt,
 	}
 
-	var outputs []wallet.CreateActionOutput
+	outputs := make([]wallet.CreateActionOutput, 0, len(adsData))
 	for _, ad := range adsData {
 		if !utils.IsValidTopicOrServiceName(ad.TopicOrServiceName) {
-			return overlay.TaggedBEEF{}, fmt.Errorf("invalid topic or service name: %s", ad.TopicOrServiceName)
+			return overlay.TaggedBEEF{}, fmt.Errorf("%w: %s", errInvalidTopicOrServiceName, ad.TopicOrServiceName)
 		}
 		protocol := wallet.Protocol{SecurityLevel: wallet.SecurityLevelEveryAppAndCounterparty}
 		if protocol.Protocol = string(ad.Protocol.ID()); protocol.Protocol == "" {
-			return overlay.TaggedBEEF{}, fmt.Errorf("unsupported protocol: %s (must be 'SHIP' or 'SLAP')", ad.Protocol)
+			return overlay.TaggedBEEF{}, fmt.Errorf("%w: %s", errUnsupportedProtocol, ad.Protocol)
 		}
-		lockingScript, err := pd.Lock(
+		lockingScript, errLock := pd.Lock(
 			context.TODO(),
 			[][]byte{
 				[]byte(ad.Protocol),
@@ -309,8 +346,8 @@ func (w *WalletAdvertiser) CreateAdvertisements(adsData []*oa.AdvertisementData)
 			true, // includeSignature
 			pushdrop.LockBefore,
 		)
-		if err != nil {
-			return overlay.TaggedBEEF{}, fmt.Errorf("failed to create locking script: %w", err)
+		if errLock != nil {
+			return overlay.TaggedBEEF{}, fmt.Errorf("failed to create locking script: %w", errLock)
 		}
 		outputs = append(outputs, wallet.CreateActionOutput{
 			OutputDescription: fmt.Sprintf("%s advertisement of %s", ad.Protocol, ad.TopicOrServiceName),
@@ -351,12 +388,12 @@ func (w *WalletAdvertiser) CreateAdvertisements(adsData []*oa.AdvertisementData)
 // This method queries the overlay network using LookupResolver to retrieve existing advertisements.
 func (w *WalletAdvertiser) FindAllAdvertisements(protocol overlay.Protocol) ([]*oa.Advertisement, error) {
 	if !w.initialized {
-		return nil, fmt.Errorf("WalletAdvertiser must be initialized before finding advertisements")
+		return nil, errNotInitializedForFind
 	}
 
 	// Validate protocol
 	if protocol != overlay.ProtocolSHIP && protocol != overlay.ProtocolSLAP {
-		return nil, fmt.Errorf("unsupported protocol: %s (must be 'SHIP' or 'SLAP')", protocol)
+		return nil, fmt.Errorf("%w: %s", errUnsupportedProtocol, protocol)
 	}
 
 	// Support custom Finder for testing
@@ -377,27 +414,26 @@ func (w *WalletAdvertiser) FindAllAdvertisements(protocol overlay.Protocol) ([]*
 // This method creates spending transactions to invalidate the specified advertisements.
 func (w *WalletAdvertiser) RevokeAdvertisements(advertisements []*oa.Advertisement) (overlay.TaggedBEEF, error) {
 	if !w.initialized {
-		return overlay.TaggedBEEF{}, fmt.Errorf("WalletAdvertiser must be initialized before revoking advertisements")
+		return overlay.TaggedBEEF{}, errNotInitializedForRevoke
 	}
 
 	if len(advertisements) == 0 {
-		return overlay.TaggedBEEF{}, fmt.Errorf("at least one advertisement is required for revocation")
+		return overlay.TaggedBEEF{}, errNoAdvertisements
 	}
 
 	// Validate all advertisements have the required revocation data
 	var topics []string
 	for i, ad := range advertisements {
 		if len(ad.Beef) == 0 {
-			return overlay.TaggedBEEF{}, fmt.Errorf("advertisement at index %d is missing BEEF data required for revocation", i)
+			return overlay.TaggedBEEF{}, fmt.Errorf("advertisement at index %d %w", i, errMissingBeefData)
 		}
 		if ad.OutputIndex == 0 {
-			return overlay.TaggedBEEF{}, fmt.Errorf("advertisement at index %d is missing output index required for revocation", i)
+			return overlay.TaggedBEEF{}, fmt.Errorf("advertisement at index %d %w", i, errMissingOutputIndex)
 		}
 
 		// Collect topics for the TaggedBEEF
-		if ad.Protocol == overlay.ProtocolSHIP {
-			topics = append(topics, "tm_"+ad.TopicOrService)
-		} else if ad.Protocol == overlay.ProtocolSLAP {
+		switch ad.Protocol {
+		case overlay.ProtocolSHIP, overlay.ProtocolSLAP:
 			topics = append(topics, "tm_"+ad.TopicOrService)
 		}
 	}
@@ -409,10 +445,7 @@ func (w *WalletAdvertiser) RevokeAdvertisements(advertisements []*oa.Advertiseme
 	}
 
 	// Encode the revocation transactions as BEEF format
-	beefData, err := w.encodeTransactionsAsBEEF(revocationTransactions)
-	if err != nil {
-		return overlay.TaggedBEEF{}, fmt.Errorf("failed to encode revocation transactions as BEEF: %w", err)
-	}
+	beefData := w.encodeTransactionsAsBEEF(revocationTransactions)
 
 	return overlay.TaggedBEEF{
 		Beef:   beefData,
@@ -424,11 +457,11 @@ func (w *WalletAdvertiser) RevokeAdvertisements(advertisements []*oa.Advertiseme
 // This method decodes PushDrop locking scripts to reconstruct advertisement data.
 func (w *WalletAdvertiser) ParseAdvertisement(outputScript *script.Script) (*oa.Advertisement, error) {
 	if !w.initialized {
-		return nil, fmt.Errorf("WalletAdvertiser must be initialized before parsing advertisements")
+		return nil, errNotInitializedForParse
 	}
 
 	if outputScript == nil || len(*outputScript) == 0 {
-		return nil, fmt.Errorf("output script cannot be empty")
+		return nil, errOutputScriptEmpty
 	}
 
 	// Convert script to hex string for PushDrop decoder
@@ -442,12 +475,12 @@ func (w *WalletAdvertiser) ParseAdvertisement(outputScript *script.Script) (*oa.
 
 	result := pushdrop.Decode(s)
 	if result == nil {
-		return nil, fmt.Errorf("failed to decode PushDrop script: %s", scriptHex)
+		return nil, fmt.Errorf("%w: %s", errInvalidPushDropScript, scriptHex)
 	}
 
 	// Validate that we have the expected number of fields
 	if len(result.Fields) < 4 {
-		return nil, fmt.Errorf("invalid PushDrop result: expected at least 4 fields, got %d", len(result.Fields))
+		return nil, fmt.Errorf("%w, got %d", errInvalidPushDropFields, len(result.Fields))
 	}
 
 	// Extract and validate protocol identifier
@@ -456,7 +489,7 @@ func (w *WalletAdvertiser) ParseAdvertisement(outputScript *script.Script) (*oa.
 	switch protocol {
 	case overlay.ProtocolSHIP, overlay.ProtocolSLAP:
 	default:
-		return nil, fmt.Errorf("unsupported protocol identifier: %s", protocolIdentifier)
+		return nil, fmt.Errorf("%w: %s", errUnsupportedProtocolID, protocolIdentifier)
 	}
 
 	// Extract other fields
@@ -473,7 +506,7 @@ func (w *WalletAdvertiser) ParseAdvertisement(outputScript *script.Script) (*oa.
 	}
 
 	if !utils.IsValidTopicOrServiceName(fullTopicOrService) {
-		return nil, fmt.Errorf("invalid topic or service name: %s", fullTopicOrService)
+		return nil, fmt.Errorf("%w: %s", errInvalidTopicOrServiceName, fullTopicOrService)
 	}
 
 	return &oa.Advertisement{
@@ -489,12 +522,12 @@ func (w *WalletAdvertiser) ParseAdvertisement(outputScript *script.Script) (*oa.
 func (w *WalletAdvertiser) validateAdvertisementData(adData *oa.AdvertisementData) error {
 	// Validate protocol
 	if adData.Protocol != overlay.ProtocolSHIP && adData.Protocol != overlay.ProtocolSLAP {
-		return fmt.Errorf("unsupported protocol: %s (must be 'SHIP' or 'SLAP')", adData.Protocol)
+		return fmt.Errorf("%w: %s", errUnsupportedProtocol, adData.Protocol)
 	}
 
 	// Validate topic or service name
 	if strings.TrimSpace(adData.TopicOrServiceName) == "" {
-		return fmt.Errorf("topicOrServiceName cannot be empty")
+		return errTopicNameEmpty
 	}
 
 	// Construct full name with appropriate prefix
@@ -507,7 +540,7 @@ func (w *WalletAdvertiser) validateAdvertisementData(adData *oa.AdvertisementDat
 
 	// Validate using utils function
 	if !utils.IsValidTopicOrServiceName(fullName) {
-		return fmt.Errorf("invalid topic or service name: %s", fullName)
+		return fmt.Errorf("%w: %s", errInvalidTopicOrServiceName, fullName)
 	}
 
 	return nil
@@ -569,7 +602,7 @@ func (w *WalletAdvertiser) validateAndInitializePrivateKey() error {
 	}
 
 	if len(privateKeyBytes) != 32 {
-		return fmt.Errorf("private key must be exactly 32 bytes (64 hex characters), got %d bytes", len(privateKeyBytes))
+		return fmt.Errorf("%w, got %d bytes", errPrivateKeyInsufficientLength, len(privateKeyBytes))
 	}
 
 	// Validate that the private key is not all zeros (insecure)
@@ -581,7 +614,7 @@ func (w *WalletAdvertiser) validateAndInitializePrivateKey() error {
 		}
 	}
 	if allZeros {
-		return fmt.Errorf("private key cannot be all zeros")
+		return errPrivateKeyAllZeros
 	}
 
 	// Basic entropy check - private key should have some randomness
@@ -591,7 +624,7 @@ func (w *WalletAdvertiser) validateAndInitializePrivateKey() error {
 		uniqueBytes[b] = true
 	}
 	if len(uniqueBytes) < 4 {
-		return fmt.Errorf("private key appears to have insufficient entropy")
+		return errPrivateKeyInsufficientEntropy
 	}
 
 	return nil
@@ -610,26 +643,42 @@ func (w *WalletAdvertiser) validateStorageConnectivity() error {
 		Timeout: 10 * time.Second,
 	}
 
+	// Create a context with a 10-second timeout for the request
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
 	// Construct a basic health check endpoint
 	// This follows common patterns where storage services expose health endpoints
 	healthURL := storageURL.ResolveReference(&url.URL{Path: "/health"})
 
 	// Attempt to connect to the storage service
-	resp, err := client.Get(healthURL.String())
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, healthURL.String(), nil)
+	if err != nil {
+		return fmt.Errorf("failed to create HTTP request: %w", err)
+	}
+
+	resp, err := client.Do(req)
 	if err != nil {
 		// If /health doesn't exist, try a simple HEAD request to the base URL
-		resp, err = client.Head(w.storageURL)
+		req, err := http.NewRequestWithContext(ctx, http.MethodHead, w.storageURL, nil)
+		if err != nil {
+			return fmt.Errorf("failed to create HTTP request: %w", err)
+		}
+
+		resp, err = client.Do(req)
 		if err != nil {
 			return fmt.Errorf("storage URL is not reachable: %w", err)
 		}
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	// Accept any response that indicates the server is responding
 	// We don't require specific status codes since different storage implementations
 	// may respond differently to health checks
 	if resp.StatusCode >= 500 {
-		return fmt.Errorf("storage service returned server error: %d %s", resp.StatusCode, resp.Status)
+		return fmt.Errorf("%w: %d %s", errStorageServerError, resp.StatusCode, resp.Status)
 	}
 
 	return nil
@@ -674,66 +723,8 @@ func (w *WalletAdvertiser) getOverlayNetwork() overlay.Network {
 	return overlay.NetworkMainnet
 }
 
-// extractDomainFromURI extracts the domain from the advertisable URI
-func (w *WalletAdvertiser) extractDomainFromURI() (string, error) {
-	// Handle custom URI schemes by normalizing them for parsing
-	normalizedURI := w.advertisableURI
-
-	// Replace custom schemes with https for parsing
-	customSchemes := []string{
-		"https+bsvauth://", "https+bsvauth+smf://",
-		"https+bsvauth+scrypt-offchain://", "https+rtt://",
-	}
-
-	for _, scheme := range customSchemes {
-		if strings.HasPrefix(normalizedURI, scheme) {
-			normalizedURI = strings.Replace(normalizedURI, scheme, "https://", 1)
-			break
-		}
-	}
-
-	parsedURL, err := url.Parse(normalizedURI)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse advertisable URI: %w", err)
-	}
-
-	return parsedURL.Hostname(), nil
-}
-
-// createSignature creates a signature over the advertisement data (placeholder implementation)
-func (w *WalletAdvertiser) createSignature(fields [][]byte) ([]byte, error) {
-	// Concatenate all fields except the signature itself
-	var dataToSign []byte
-	for _, field := range fields {
-		dataToSign = append(dataToSign, field...)
-	}
-
-	// In a real implementation, this would use proper ECDSA signing
-	// For now, create a deterministic pseudo-signature based on the data and private key
-	privateKeyBytes, err := hex.DecodeString(w.privateKey)
-	if err != nil {
-		return nil, err
-	}
-
-	// Create a simple hash-based signature (NOT cryptographically secure)
-	signature := make([]byte, 64) // Typical ECDSA signature length
-
-	// Mix private key with data to create deterministic signature
-	for i := 0; i < 64; i++ {
-		if i < len(dataToSign) && i < len(privateKeyBytes) {
-			signature[i] = dataToSign[i] ^ privateKeyBytes[i%32]
-		} else if i < len(dataToSign) {
-			signature[i] = dataToSign[i]
-		} else {
-			signature[i] = privateKeyBytes[i%32]
-		}
-	}
-
-	return signature, nil
-}
-
 // encodeTransactionsAsBEEF encodes transactions in BEEF (Binary Extensible Exchange Format)
-func (w *WalletAdvertiser) encodeTransactionsAsBEEF(transactions []*Transaction) ([]byte, error) {
+func (w *WalletAdvertiser) encodeTransactionsAsBEEF(transactions []*Transaction) []byte {
 	var beefData []byte
 
 	// BEEF format header (simplified version)
@@ -745,18 +736,15 @@ func (w *WalletAdvertiser) encodeTransactionsAsBEEF(transactions []*Transaction)
 
 	// Encode each transaction
 	for _, tx := range transactions {
-		txBytes, err := w.encodeTransaction(tx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to encode transaction: %w", err)
-		}
+		txBytes := w.encodeTransaction(tx)
 		beefData = append(beefData, txBytes...)
 	}
 
-	return beefData, nil
+	return beefData
 }
 
 // encodeTransaction encodes a transaction in Bitcoin format
-func (w *WalletAdvertiser) encodeTransaction(tx *Transaction) ([]byte, error) {
+func (w *WalletAdvertiser) encodeTransaction(tx *Transaction) []byte {
 	var txBytes []byte
 
 	// Version (4 bytes, little endian)
@@ -795,22 +783,23 @@ func (w *WalletAdvertiser) encodeTransaction(tx *Transaction) ([]byte, error) {
 	// Lock time (4 bytes, little endian)
 	txBytes = append(txBytes, w.encodeUint32(tx.LockTime)...)
 
-	return txBytes, nil
+	return txBytes
 }
 
 // encodeVarInt encodes a variable-length integer
 func (w *WalletAdvertiser) encodeVarInt(value uint64) []byte {
 	if value < 0xfd {
 		return []byte{byte(value)}
-	} else if value <= 0xffff {
+	}
+	if value <= 0xffff {
 		return []byte{0xfd, byte(value), byte(value >> 8)}
-	} else if value <= 0xffffffff {
+	}
+	if value <= 0xffffffff {
 		return []byte{0xfe, byte(value), byte(value >> 8), byte(value >> 16), byte(value >> 24)}
-	} else {
-		return []byte{
-			0xff, byte(value), byte(value >> 8), byte(value >> 16), byte(value >> 24),
-			byte(value >> 32), byte(value >> 40), byte(value >> 48), byte(value >> 56),
-		}
+	}
+	return []byte{
+		0xff, byte(value), byte(value >> 8), byte(value >> 16), byte(value >> 24),
+		byte(value >> 32), byte(value >> 40), byte(value >> 48), byte(value >> 56),
 	}
 }
 
@@ -940,130 +929,9 @@ type StorageAdvertisement struct {
 	UpdatedAt      time.Time `json:"updatedAt"`
 }
 
-// convertStorageToAdvertisement converts a storage advertisement to our Advertisement type
-func (w *WalletAdvertiser) convertStorageToAdvertisement(storageAd StorageAdvertisement) (oa.Advertisement, error) {
-	// Convert protocol string to Protocol type
-	var protocol overlay.Protocol
-	switch storageAd.Protocol {
-	case "SHIP":
-		protocol = overlay.ProtocolSHIP
-	case "SLAP":
-		protocol = overlay.ProtocolSLAP
-	default:
-		return oa.Advertisement{}, fmt.Errorf("unknown protocol: %s", storageAd.Protocol)
-	}
-
-	// Decode BEEF data if present
-	var beefData []byte
-	if storageAd.BEEF != "" {
-		var err error
-		beefData, err = w.decodeBEEFFromStorage(storageAd.BEEF)
-		if err != nil {
-			return oa.Advertisement{}, fmt.Errorf("failed to decode BEEF data: %w", err)
-		}
-	}
-
-	var outputIndex uint32 = 0
-	if storageAd.OutputIndex != nil {
-		outputIndex = uint32(*storageAd.OutputIndex)
-	}
-
-	return oa.Advertisement{
-		Protocol:       protocol,
-		IdentityKey:    storageAd.IdentityKey,
-		Domain:         storageAd.Domain,
-		TopicOrService: storageAd.TopicOrService,
-		Beef:           beefData,
-		OutputIndex:    outputIndex,
-	}, nil
-}
-
-// convertStorageToNewAdvertisement converts a storage advertisement to our Advertisement type (new types)
-func (w *WalletAdvertiser) convertStorageToNewAdvertisement(storageAd StorageAdvertisement) (*oa.Advertisement, error) {
-	// Convert protocol string to Protocol type
-	var protocol overlay.Protocol
-	switch storageAd.Protocol {
-	case "SHIP":
-		protocol = overlay.ProtocolSHIP
-	case "SLAP":
-		protocol = overlay.ProtocolSLAP
-	default:
-		return nil, fmt.Errorf("unknown protocol: %s", storageAd.Protocol)
-	}
-
-	// Decode BEEF data if present
-	var beefData []byte
-	if storageAd.BEEF != "" {
-		var err error
-		beefData, err = w.decodeBEEFFromStorage(storageAd.BEEF)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode BEEF data: %w", err)
-		}
-	}
-
-	var outputIndex uint32 = 0
-	if storageAd.OutputIndex != nil {
-		outputIndex = uint32(*storageAd.OutputIndex)
-	}
-
-	return &oa.Advertisement{
-		Protocol:       protocol,
-		IdentityKey:    storageAd.IdentityKey,
-		Domain:         storageAd.Domain,
-		TopicOrService: storageAd.TopicOrService,
-		Beef:           beefData,
-		OutputIndex:    outputIndex,
-	}, nil
-}
-
-// decodeBEEFFromStorage decodes BEEF data from storage format (assumed to be base64 or hex)
-func (w *WalletAdvertiser) decodeBEEFFromStorage(encodedBEEF string) ([]byte, error) {
-	// Try base64 first (common for JSON APIs)
-	if beefData, err := w.decodeBase64(encodedBEEF); err == nil {
-		return beefData, nil
-	}
-
-	// Try hex as fallback
-	if beefData, err := hex.DecodeString(encodedBEEF); err == nil {
-		return beefData, nil
-	}
-
-	return nil, fmt.Errorf("BEEF data is not valid base64 or hex: %s", encodedBEEF[:min(20, len(encodedBEEF))])
-}
-
-// decodeBase64 decodes base64 encoded data
-func (w *WalletAdvertiser) decodeBase64(encoded string) ([]byte, error) {
-	// This would use standard base64 decoding in a real implementation
-	// For now, return an error to force hex decoding
-	return nil, fmt.Errorf("base64 decoding not implemented")
-}
-
-// min returns the minimum of two integers
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-// createRevocationTransactions creates spending transactions to revoke advertisements
-func (w *WalletAdvertiser) createRevocationTransactions(advertisements []oa.Advertisement) ([]*Transaction, error) {
-	var transactions []*Transaction
-
-	for i, ad := range advertisements {
-		tx, err := w.createSingleRevocationTransaction(ad)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create revocation transaction for advertisement %d: %w", i, err)
-		}
-		transactions = append(transactions, tx)
-	}
-
-	return transactions, nil
-}
-
 // createNewRevocationTransactions creates spending transactions to revoke advertisements (new types)
 func (w *WalletAdvertiser) createNewRevocationTransactions(advertisements []*oa.Advertisement) ([]*Transaction, error) {
-	var transactions []*Transaction
+	transactions := make([]*Transaction, 0, len(advertisements))
 
 	for i, ad := range advertisements {
 		tx, err := w.createSingleNewRevocationTransaction(ad)
@@ -1074,39 +942,6 @@ func (w *WalletAdvertiser) createNewRevocationTransactions(advertisements []*oa.
 	}
 
 	return transactions, nil
-}
-
-// createSingleRevocationTransaction creates a single revocation transaction
-func (w *WalletAdvertiser) createSingleRevocationTransaction(ad oa.Advertisement) (*Transaction, error) {
-	// Parse the BEEF data to extract the original transaction
-	originalTx, err := w.parseTransactionFromBEEF(ad.Beef)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse original transaction from BEEF: %w", err)
-	}
-
-	// Create the spending transaction
-	revocationTx := &Transaction{
-		Version: 1,
-		Inputs: []TransactionInput{
-			{
-				PreviousOutput: OutPoint{
-					Hash:  w.calculateTransactionHash(originalTx),
-					Index: ad.OutputIndex,
-				},
-				ScriptSig: w.createRevocationScriptSig(),
-				Sequence:  0xffffffff,
-			},
-		},
-		Outputs: []TransactionOutput{
-			{
-				Value:         1, // Minimal output to make transaction valid
-				LockingScript: w.createSimpleLockingScript(),
-			},
-		},
-		LockTime: 0,
-	}
-
-	return revocationTx, nil
 }
 
 // createSingleNewRevocationTransaction creates a single revocation transaction (new types)
@@ -1145,7 +980,7 @@ func (w *WalletAdvertiser) createSingleNewRevocationTransaction(ad *oa.Advertise
 // parseTransactionFromBEEF extracts transaction data from BEEF format
 func (w *WalletAdvertiser) parseTransactionFromBEEF(beefData []byte) (*Transaction, error) {
 	if len(beefData) < 8 {
-		return nil, fmt.Errorf("BEEF data too short")
+		return nil, errBEEFTooShort
 	}
 
 	// Skip BEEF header (simplified parsing)
@@ -1167,7 +1002,7 @@ func (w *WalletAdvertiser) parseTransactionFromBEEF(beefData []byte) (*Transacti
 // parseTransaction parses a transaction from binary data
 func (w *WalletAdvertiser) parseTransaction(data []byte) (*Transaction, error) {
 	if len(data) < 10 {
-		return nil, fmt.Errorf("transaction data too short")
+		return nil, errTransactionTooShort
 	}
 
 	offset := 0
@@ -1178,7 +1013,7 @@ func (w *WalletAdvertiser) parseTransaction(data []byte) (*Transaction, error) {
 
 	// Parse input count
 	inputCount, varIntSize := w.parseVarInt(data[offset:])
-	offset += varIntSize
+	_ = varIntSize // varIntSize not used in simplified parsing
 
 	// Create transaction with dummy data (simplified parsing)
 	tx := &Transaction{

@@ -111,14 +111,14 @@ func TestNewWalletAdvertiser(t *testing.T) {
 			advertiser, err := NewWalletAdvertiser(tt.chain, tt.privateKey, tt.storageURL, tt.advertisableURI, tt.lookupConfig)
 
 			if tt.shouldSucceed {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotNil(t, advertiser)
 				assert.Equal(t, tt.chain, advertiser.GetChain())
 				assert.Equal(t, tt.storageURL, advertiser.GetStorageURL())
 				assert.Equal(t, tt.advertisableURI, advertiser.GetAdvertisableURI())
 				assert.False(t, advertiser.IsInitialized())
 			} else {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.expectedError)
 				assert.Nil(t, advertiser)
 			}
@@ -139,12 +139,12 @@ func TestWalletAdvertiser_Init(t *testing.T) {
 	advertiser.SetSkipStorageValidation(true) // Skip storage validation for test
 
 	err = advertiser.Init()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, advertiser.IsInitialized())
 
 	// Test double initialization
 	err = advertiser.Init()
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "WalletAdvertiser is already initialized")
 }
 
@@ -210,12 +210,12 @@ func TestWalletAdvertiser_CreateAdvertisements(t *testing.T) {
 			result, err := advertiser.CreateAdvertisements(tt.adsData)
 
 			if tt.shouldFail || tt.expectedError != "" {
-				assert.Error(t, err)
+				require.Error(t, err)
 				if tt.expectedError != "" {
 					assert.Contains(t, err.Error(), tt.expectedError)
 				}
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotNil(t, result)
 			}
 		})
@@ -254,12 +254,12 @@ func TestWalletAdvertiser_FindAllAdvertisements(t *testing.T) {
 			result, err := advertiser.FindAllAdvertisements(tt.protocol)
 
 			if tt.shouldFail || tt.expectedError != "" {
-				assert.Error(t, err)
+				require.Error(t, err)
 				if tt.expectedError != "" {
 					assert.Contains(t, err.Error(), tt.expectedError)
 				}
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotNil(t, result)
 			}
 		})
@@ -328,12 +328,12 @@ func TestWalletAdvertiser_RevokeAdvertisements(t *testing.T) {
 			result, err := advertiser.RevokeAdvertisements(tt.advertisements)
 
 			if tt.shouldFail || tt.expectedError != "" {
-				assert.Error(t, err)
+				require.Error(t, err)
 				if tt.expectedError != "" {
 					assert.Contains(t, err.Error(), tt.expectedError)
 				}
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotNil(t, result)
 			}
 		})
@@ -355,13 +355,12 @@ func (m *MockFinder) Advertisements(protocol overlay.Protocol) ([]*oa.Advertisem
 	}, nil
 }
 
-func (m *MockFinder) CreateAdvertisements(adsData []*oa.AdvertisementData, identityKey, advertisableURI string) (overlay.TaggedBEEF, error) {
+func (m *MockFinder) CreateAdvertisements(adsData []*oa.AdvertisementData, _, _ string) (overlay.TaggedBEEF, error) {
 	// Create mock topics based on the advertisements
 	var topics []string
 	for _, adData := range adsData {
-		if adData.Protocol == overlay.ProtocolSHIP {
-			topics = append(topics, "tm_"+adData.TopicOrServiceName)
-		} else if adData.Protocol == overlay.ProtocolSLAP {
+		switch adData.Protocol {
+		case overlay.ProtocolSHIP, overlay.ProtocolSLAP:
 			topics = append(topics, "tm_"+adData.TopicOrServiceName)
 		}
 	}
@@ -483,7 +482,7 @@ func TestWalletAdvertiser_ParseAdvertisement(t *testing.T) {
 		}
 		parsedAd, err := advertiser.ParseAdvertisement(tx.Outputs[0].LockingScript)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, parsedAd)
 		assert.Equal(t, overlay.ProtocolSHIP, parsedAd.Protocol)
 		assert.Equal(t, "tm_meter", parsedAd.TopicOrService)
@@ -506,20 +505,20 @@ func TestWalletAdvertiser_MethodsRequireInitialization(t *testing.T) {
 
 	// Test that methods fail when not initialized
 	_, err = advertiser.CreateAdvertisements([]*oa.AdvertisementData{{Protocol: overlay.ProtocolSHIP, TopicOrServiceName: "test"}})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "WalletAdvertiser must be initialized")
 
 	_, err = advertiser.FindAllAdvertisements(overlay.ProtocolSHIP)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "WalletAdvertiser must be initialized")
 
 	_, err = advertiser.RevokeAdvertisements([]*oa.Advertisement{{Protocol: overlay.ProtocolSHIP}})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "WalletAdvertiser must be initialized")
 
 	testScript := script.NewFromBytes([]byte{0x01})
 	_, err = advertiser.ParseAdvertisement(testScript)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "WalletAdvertiser must be initialized")
 }
 
