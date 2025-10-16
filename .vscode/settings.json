@@ -80,7 +80,7 @@
             "-.mage-cache"
         ],
         "formatting.gofumpt": true,
-        "formatting.local": "github.com/bsv-blockchain/go-overlay-discovery-service",
+        "formatting.local": "github.com/bsv-blockchain/go-overlay-discovery-services",
         "symbolMatcher": "fastfuzzy",
         "symbolStyle": "full",
         "ui.completion.completeFunctionCalls": true,

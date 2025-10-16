@@ -8,7 +8,7 @@
             ],
             "settings": {
                 "editor.codeActionsOnSave": {
-                    "source.organizeImports": true
+                    "source.organizeImports": "explicit"
                 },
                 "editor.formatOnSave": true,
                 "go.lintTool": "golangci-lint",
@@ -28,8 +28,9 @@
         "type=cache,target=/home/vscode/.cache/go-build",
         "type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock"
     ],
-    "name": "go-template dev container",
-    "postCreateCommand": "make lint && go vet ./... && go test ./...",
+    "name": "go-overlay-discovery-services dev container",
+    "postCreateCommand": "magex lint && magex vet && magex test",
+    "postStartCommand": "go install github.com/magefile/mage/cmd/magex@latest",
     "remoteUser": "vscode",
     "runArgs": [
         "--cap-drop=ALL",
