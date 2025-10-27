@@ -191,7 +191,12 @@
                 "simple": true
             },
             "revive": {
-                "config": ".revive.toml"
+                "rules": [
+                    {
+                        "name": "var-naming",
+                        "disabled": true
+                    }
+                ]
             },
             "unparam": {
                 "check-exported": false
