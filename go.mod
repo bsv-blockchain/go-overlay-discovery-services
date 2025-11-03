@@ -3,8 +3,8 @@ module github.com/bsv-blockchain/go-overlay-discovery-services
 go 1.24.3
 
 require (
-	github.com/bsv-blockchain/go-overlay-services v0.1.1
-	github.com/bsv-blockchain/go-sdk v1.2.10
+	github.com/bsv-blockchain/go-overlay-services v1.2.0
+	github.com/bsv-blockchain/go-sdk v1.2.11
 	github.com/bsv-blockchain/go-wallet-toolbox v0.145.0
 	github.com/stretchr/testify v1.11.1
 	go.mongodb.org/mongo-driver v1.17.6
@@ -38,7 +38,7 @@ require (
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/jonboulle/clockwork v0.5.0 // indirect
-	github.com/klauspost/compress v1.18.0 // indirect
+	github.com/klauspost/compress v1.18.1 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-sqlite3 v1.14.32 // indirect
 	github.com/montanaflynn/stats v0.7.1 // indirect
@@ -75,7 +75,7 @@ require (
 	gorm.io/driver/postgres v1.6.0 // indirect
 	gorm.io/driver/sqlite v1.6.0 // indirect
 	gorm.io/gen v0.3.27 // indirect
-	gorm.io/gorm v1.31.0 // indirect
+	gorm.io/gorm v1.31.1 // indirect
 	gorm.io/hints v1.1.2 // indirect
 	gorm.io/plugin/dbresolver v1.6.2 // indirect
 )
