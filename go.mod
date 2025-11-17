@@ -5,7 +5,7 @@ go 1.24.3
 require (
 	github.com/bsv-blockchain/go-overlay-services v1.2.0
 	github.com/bsv-blockchain/go-sdk v1.2.11
-	github.com/bsv-blockchain/go-wallet-toolbox v0.148.0
+	github.com/bsv-blockchain/go-wallet-toolbox v0.151.0
 	github.com/stretchr/testify v1.11.1
 	go.mongodb.org/mongo-driver v1.17.6
 )
