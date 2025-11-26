@@ -15,8 +15,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
-	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/utils"
 	oa "github.com/bsv-blockchain/go-overlay-services/pkg/core/advertiser"
 	authhttp "github.com/bsv-blockchain/go-sdk/auth/clients/authhttp"
 	"github.com/bsv-blockchain/go-sdk/overlay"
@@ -32,6 +30,9 @@ import (
 	"github.com/bsv-blockchain/go-wallet-toolbox/pkg/storage"
 	toolboxWallet "github.com/bsv-blockchain/go-wallet-toolbox/pkg/wallet"
 	"github.com/bsv-blockchain/go-wallet-toolbox/pkg/wdk"
+
+	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
+	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/utils"
 )
 
 // AdTokenValue is the default token value used for advertisements.

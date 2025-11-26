@@ -10,16 +10,16 @@ import (
 	"log/slog"
 	"os"
 
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
-
-	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/ship"
-	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
 	"github.com/bsv-blockchain/go-overlay-services/pkg/core/engine"
 	"github.com/bsv-blockchain/go-sdk/chainhash"
 	"github.com/bsv-blockchain/go-sdk/overlay/lookup"
 	"github.com/bsv-blockchain/go-sdk/script"
 	"github.com/bsv-blockchain/go-sdk/transaction"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+
+	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/ship"
+	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
 )
 
 //nolint:gochecknoglobals // logger is used across multiple example functions

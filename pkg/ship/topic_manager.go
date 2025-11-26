@@ -12,10 +12,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/utils"
 	"github.com/bsv-blockchain/go-sdk/overlay"
 	"github.com/bsv-blockchain/go-sdk/transaction"
 	"github.com/bsv-blockchain/go-sdk/transaction/template/pushdrop"
+
+	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/utils"
 )
 
 // Static error variables for err113 compliance

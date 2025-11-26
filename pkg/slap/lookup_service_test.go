@@ -7,7 +7,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
 	"github.com/bsv-blockchain/go-overlay-services/pkg/core/engine"
 	"github.com/bsv-blockchain/go-sdk/chainhash"
 	"github.com/bsv-blockchain/go-sdk/overlay/lookup"
@@ -16,6 +15,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
 )
 
 const TxID = "bdf1e48e845a65ba8c139c9b94844de30716f38d53787ba0a435e8705c4216d5"

@@ -5,14 +5,14 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/bsv-blockchain/go-sdk/transaction"
-
-	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
 	oa "github.com/bsv-blockchain/go-overlay-services/pkg/core/advertiser"
 	"github.com/bsv-blockchain/go-sdk/overlay"
 	"github.com/bsv-blockchain/go-sdk/script"
+	"github.com/bsv-blockchain/go-sdk/transaction"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
 )
 
 func TestNewWalletAdvertiser(t *testing.T) {

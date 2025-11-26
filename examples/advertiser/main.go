@@ -7,11 +7,12 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/advertiser"
-	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
 	oa "github.com/bsv-blockchain/go-overlay-services/pkg/core/advertiser"
 	"github.com/bsv-blockchain/go-sdk/overlay"
 	"github.com/bsv-blockchain/go-sdk/script"
+
+	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/advertiser"
+	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
 )
 
 func main() {
