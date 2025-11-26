@@ -193,8 +193,8 @@
             "revive": {
                 "rules": [
                     {
-                        "name": "var-naming",
-                        "disabled": true
+                        "disabled": true,
+                        "name": "var-naming"
                     }
                 ]
             },
