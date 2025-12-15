@@ -14,8 +14,8 @@ github.com/b-open-io/go-sdk v1.1.25-0.20251001222414-53a8f5db1645 h1:1FX+WSHofn1
 github.com/b-open-io/go-sdk v1.1.25-0.20251001222414-53a8f5db1645/go.mod h1:C1r7iZbRUCbC015GjbhcpwH0jL5ubPn5XaQgjvUaPdU=
 github.com/bsv-blockchain/go-bsv-middleware v0.12.2 h1:T6yWKiGIGjizVEOn0bNrdxG3MuDs2Rxvkf07WiNP9PE=
 github.com/bsv-blockchain/go-bsv-middleware v0.12.2/go.mod h1:SM07pCDldO9Gl7fFp2mxL85zDJOcu8Fcd1J+70Wje4w=
-github.com/bsv-blockchain/go-wallet-toolbox v0.159.0 h1:twG8sWMEYS+z13FrdIRs5ZctGD0abjTDQj1CS3ejsjU=
-github.com/bsv-blockchain/go-wallet-toolbox v0.159.0/go.mod h1:hcBmUceDRq557VvlPYJJuGIMixHwFuA9gr4wQnc3WTw=
+github.com/bsv-blockchain/go-wallet-toolbox v0.160.0 h1:ahjfCVTMZ9Q1t4ixiXFkpfzvFlK0QrXCSZPPceWKiS8=
+github.com/bsv-blockchain/go-wallet-toolbox v0.160.0/go.mod h1:tI6jI7Ox5+PIM6lKxlOCJULwyyqeJPLdFrzgQ/R1OVo=
 github.com/bsv-blockchain/universal-test-vectors v0.6.1 h1:6mRV8T4ug8456p/rufoDselui3eKY6kr9mRYx8e87Rw=
 github.com/bsv-blockchain/universal-test-vectors v0.6.1/go.mod h1:aNNGIH9aN/aCQ9vw0gTiQiOajkyBQIPJM9O6nHhhF5g=
 github.com/cenkalti/backoff/v4 v4.3.0 h1:MyRJ/UdXutAwSAT+s3wNd7MfTIcy71VQueUuFK343L8=
@@ -61,8 +61,8 @@ github.com/fsnotify/fsnotify v1.9.0 h1:2Ml+OJNzbYCTzsxtv8vKSFD9PbJjmhYF14k/jKC7S
 github.com/fsnotify/fsnotify v1.9.0/go.mod h1:8jBTzvmWwFyi3Pb8djgCCO5IBqzKJ/Jwo8TRcHyHii0=
 github.com/go-co-op/gocron-gorm-lock/v2 v2.1.0 h1:lrbHDoByFMHyaUnP7IkCAlMKaEi7UC1UpvSettE0T9U=
 github.com/go-co-op/gocron-gorm-lock/v2 v2.1.0/go.mod h1:OFkOAruhDmuvhSGTtYVM0Id0N1e3VJJDpwf2oL1DMj0=
-github.com/go-co-op/gocron/v2 v2.18.1 h1:VVxgAghLW1Q6VHi/rc+B0ZSpFoUVlWgkw09Yximvn58=
-github.com/go-co-op/gocron/v2 v2.18.1/go.mod h1:Zii6he+Zfgy5W9B+JKk/KwejFOW0kZTFvHtwIpR4aBI=
+github.com/go-co-op/gocron/v2 v2.18.2 h1:+5VU41FUXPWSPKLXZQ/77SGzUiPCcakU0v7ENc2H20Q=
+github.com/go-co-op/gocron/v2 v2.18.2/go.mod h1:Zii6he+Zfgy5W9B+JKk/KwejFOW0kZTFvHtwIpR4aBI=
 github.com/go-logr/logr v1.4.3 h1:CjnDlHq8ikf6E492q6eKboGOC0T8CDaOvkHCIg8idEI=
 github.com/go-logr/logr v1.4.3/go.mod h1:9T104GzyrTigFIr8wt5mBrctHMim0Nb2HLGrmQ40KvY=
 github.com/go-logr/stdr v1.2.2 h1:hSWxHoqTgW2S2qGc0LTAI563KZ5YKYRhT3MFKZMbjag=

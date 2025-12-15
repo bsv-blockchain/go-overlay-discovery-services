@@ -4,8 +4,8 @@ go 1.24.3
 
 require (
 	github.com/bsv-blockchain/go-overlay-services v1.2.2
-	github.com/bsv-blockchain/go-sdk v1.2.12
-	github.com/bsv-blockchain/go-wallet-toolbox v0.159.0
+	github.com/bsv-blockchain/go-sdk v1.2.13
+	github.com/bsv-blockchain/go-wallet-toolbox v0.160.0
 	github.com/stretchr/testify v1.11.1
 	go.mongodb.org/mongo-driver v1.17.6
 )
@@ -21,7 +21,7 @@ require (
 	github.com/filecoin-project/go-jsonrpc v0.9.0 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/go-co-op/gocron-gorm-lock/v2 v2.1.0 // indirect
-	github.com/go-co-op/gocron/v2 v2.18.1 // indirect
+	github.com/go-co-op/gocron/v2 v2.18.2 // indirect
 	github.com/go-resty/resty/v2 v2.17.0 // indirect
 	github.com/go-softwarelab/common v1.8.0 // indirect
 	github.com/go-sql-driver/mysql v1.9.3 // indirect
