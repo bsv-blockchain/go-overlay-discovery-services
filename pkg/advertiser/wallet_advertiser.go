@@ -726,7 +726,8 @@ func (w *WalletAdvertiser) getOverlayNetwork() overlay.Network {
 
 // encodeTransactionsAsBEEF encodes transactions in BEEF (Binary Extensible Exchange Format)
 func (w *WalletAdvertiser) encodeTransactionsAsBEEF(transactions []*Transaction) []byte {
-	var beefData []byte
+	// Preallocate with header size (8) plus estimate for transactions
+	beefData := make([]byte, 0, 8+len(transactions)*256)
 
 	// BEEF format header (simplified version)
 	beefData = append(beefData, []byte("BEEF")...)      // Magic bytes
@@ -746,7 +747,9 @@ func (w *WalletAdvertiser) encodeTransactionsAsBEEF(transactions []*Transaction)
 
 // encodeTransaction encodes a transaction in Bitcoin format
 func (w *WalletAdvertiser) encodeTransaction(tx *Transaction) []byte {
-	var txBytes []byte
+	// Estimate size: version(4) + locktime(4) + inputs(~50 each) + outputs(~40 each)
+	estimatedSize := 8 + len(tx.Inputs)*50 + len(tx.Outputs)*40
+	txBytes := make([]byte, 0, estimatedSize)
 
 	// Version (4 bytes, little endian)
 	txBytes = append(txBytes, w.encodeUint32(tx.Version)...)
