@@ -115,7 +115,12 @@ func IsTokenSignatureCorrectlyLinked(ctx context.Context, lockingPublicKey strin
 
 // flattenFields concatenates all field bytes into a single byte slice for signature verification
 func flattenFields(fields TokenFields) []byte {
-	var result []byte
+	// Calculate total size for preallocation
+	totalSize := 0
+	for _, field := range fields {
+		totalSize += len(field)
+	}
+	result := make([]byte, 0, totalSize)
 	for _, field := range fields {
 		result = append(result, field...)
 	}

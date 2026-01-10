@@ -549,3 +549,451 @@ func stringPtr(s string) *string {
 func intPtr(i int) *int {
 	return &i
 }
+
+// Tests for encoding functions
+
+func TestWalletAdvertiser_encodeVarInt(t *testing.T) {
+	advertiser := setupInitializedAdvertiser(t)
+
+	tests := []struct {
+		name     string
+		value    uint64
+		expected []byte
+	}{
+		{
+			name:     "Zero",
+			value:    0,
+			expected: []byte{0x00},
+		},
+		{
+			name:     "Single byte - small value",
+			value:    100,
+			expected: []byte{0x64},
+		},
+		{
+			name:     "Single byte - max single byte (0xfc)",
+			value:    0xfc,
+			expected: []byte{0xfc},
+		},
+		{
+			name:     "Two bytes - minimum (0xfd)",
+			value:    0xfd,
+			expected: []byte{0xfd, 0xfd, 0x00},
+		},
+		{
+			name:     "Two bytes - 256",
+			value:    256,
+			expected: []byte{0xfd, 0x00, 0x01},
+		},
+		{
+			name:     "Two bytes - max (0xffff)",
+			value:    0xffff,
+			expected: []byte{0xfd, 0xff, 0xff},
+		},
+		{
+			name:     "Four bytes - minimum (0x10000)",
+			value:    0x10000,
+			expected: []byte{0xfe, 0x00, 0x00, 0x01, 0x00},
+		},
+		{
+			name:     "Four bytes - 1 million",
+			value:    1000000,
+			expected: []byte{0xfe, 0x40, 0x42, 0x0f, 0x00},
+		},
+		{
+			name:     "Four bytes - max (0xffffffff)",
+			value:    0xffffffff,
+			expected: []byte{0xfe, 0xff, 0xff, 0xff, 0xff},
+		},
+		{
+			name:     "Eight bytes - minimum (0x100000000)",
+			value:    0x100000000,
+			expected: []byte{0xff, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00},
+		},
+		{
+			name:     "Eight bytes - large value",
+			value:    0x123456789abcdef0,
+			expected: []byte{0xff, 0xf0, 0xde, 0xbc, 0x9a, 0x78, 0x56, 0x34, 0x12},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := advertiser.encodeVarInt(tt.value)
+			assert.Equal(t, tt.expected, result, "encodeVarInt(%d) = %v, expected %v", tt.value, result, tt.expected)
+		})
+	}
+}
+
+func TestWalletAdvertiser_encodeUint32(t *testing.T) {
+	advertiser := setupInitializedAdvertiser(t)
+
+	tests := []struct {
+		name     string
+		value    uint32
+		expected []byte
+	}{
+		{
+			name:     "Zero",
+			value:    0,
+			expected: []byte{0x00, 0x00, 0x00, 0x00},
+		},
+		{
+			name:     "One",
+			value:    1,
+			expected: []byte{0x01, 0x00, 0x00, 0x00},
+		},
+		{
+			name:     "256 (little endian)",
+			value:    256,
+			expected: []byte{0x00, 0x01, 0x00, 0x00},
+		},
+		{
+			name:     "0x12345678 (little endian)",
+			value:    0x12345678,
+			expected: []byte{0x78, 0x56, 0x34, 0x12},
+		},
+		{
+			name:     "Max uint32",
+			value:    0xffffffff,
+			expected: []byte{0xff, 0xff, 0xff, 0xff},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := advertiser.encodeUint32(tt.value)
+			assert.Equal(t, tt.expected, result, "encodeUint32(%d) = %v, expected %v", tt.value, result, tt.expected)
+		})
+	}
+}
+
+func TestWalletAdvertiser_encodeUint64(t *testing.T) {
+	advertiser := setupInitializedAdvertiser(t)
+
+	tests := []struct {
+		name     string
+		value    uint64
+		expected []byte
+	}{
+		{
+			name:     "Zero",
+			value:    0,
+			expected: []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+		},
+		{
+			name:     "One",
+			value:    1,
+			expected: []byte{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+		},
+		{
+			name:     "1 satoshi (typical value)",
+			value:    100000000,
+			expected: []byte{0x00, 0xe1, 0xf5, 0x05, 0x00, 0x00, 0x00, 0x00},
+		},
+		{
+			name:     "0x123456789abcdef0 (little endian)",
+			value:    0x123456789abcdef0,
+			expected: []byte{0xf0, 0xde, 0xbc, 0x9a, 0x78, 0x56, 0x34, 0x12},
+		},
+		{
+			name:     "Max uint64",
+			value:    0xffffffffffffffff,
+			expected: []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := advertiser.encodeUint64(tt.value)
+			assert.Equal(t, tt.expected, result, "encodeUint64(%d) = %v, expected %v", tt.value, result, tt.expected)
+		})
+	}
+}
+
+func TestWalletAdvertiser_encodeTransaction(t *testing.T) {
+	advertiser := setupInitializedAdvertiser(t)
+
+	tests := []struct {
+		name        string
+		tx          *Transaction
+		checkPrefix []byte // Check that the result starts with these bytes
+		minLen      int    // Minimum expected length
+	}{
+		{
+			name: "Empty transaction",
+			tx: &Transaction{
+				Version:  1,
+				Inputs:   []TransactionInput{},
+				Outputs:  []TransactionOutput{},
+				LockTime: 0,
+			},
+			// Version (4 bytes) + input count varint (1) + output count varint (1) + locktime (4)
+			checkPrefix: []byte{0x01, 0x00, 0x00, 0x00}, // Version 1 little endian
+			minLen:      10,
+		},
+		{
+			name: "Transaction with one input",
+			tx: &Transaction{
+				Version: 2,
+				Inputs: []TransactionInput{
+					{
+						PreviousOutput: OutPoint{
+							Hash:  [32]byte{0x01, 0x02, 0x03, 0x04},
+							Index: 0,
+						},
+						ScriptSig: []byte{0xab, 0xcd},
+						Sequence:  0xffffffff,
+					},
+				},
+				Outputs:  []TransactionOutput{},
+				LockTime: 0,
+			},
+			checkPrefix: []byte{0x02, 0x00, 0x00, 0x00}, // Version 2 little endian
+			minLen:      50,                             // Version + input count + input data + output count + locktime
+		},
+		{
+			name: "Transaction with one output",
+			tx: &Transaction{
+				Version: 1,
+				Inputs:  []TransactionInput{},
+				Outputs: []TransactionOutput{
+					{
+						Value:         1000,
+						LockingScript: []byte{0x76, 0xa9, 0x14}, // OP_DUP OP_HASH160 <20 bytes>
+					},
+				},
+				LockTime: 500000,
+			},
+			checkPrefix: []byte{0x01, 0x00, 0x00, 0x00}, // Version 1 little endian
+			minLen:      20,
+		},
+		{
+			name: "Full transaction with inputs and outputs",
+			tx: &Transaction{
+				Version: 1,
+				Inputs: []TransactionInput{
+					{
+						PreviousOutput: OutPoint{
+							Hash:  [32]byte{0xff, 0xee, 0xdd, 0xcc},
+							Index: 1,
+						},
+						ScriptSig: []byte{0x48, 0x30, 0x45}, // Partial signature bytes
+						Sequence:  0xfffffffe,
+					},
+				},
+				Outputs: []TransactionOutput{
+					{
+						Value:         50000,
+						LockingScript: []byte{0x76, 0xa9, 0x14, 0x00, 0x01, 0x02},
+					},
+					{
+						Value:         10000,
+						LockingScript: []byte{0xa9, 0x14},
+					},
+				},
+				LockTime: 0,
+			},
+			checkPrefix: []byte{0x01, 0x00, 0x00, 0x00},
+			minLen:      70,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := advertiser.encodeTransaction(tt.tx)
+
+			// Verify minimum length
+			assert.GreaterOrEqual(t, len(result), tt.minLen, "encoded transaction should be at least %d bytes", tt.minLen)
+
+			// Verify prefix (version)
+			assert.Equal(t, tt.checkPrefix, result[:len(tt.checkPrefix)], "transaction should start with correct version bytes")
+
+			// Verify locktime is at the end (4 bytes)
+			lockTimeBytes := advertiser.encodeUint32(tt.tx.LockTime)
+			assert.Equal(t, lockTimeBytes, result[len(result)-4:], "transaction should end with correct locktime bytes")
+		})
+	}
+}
+
+func TestWalletAdvertiser_encodeTransactionsAsBEEF(t *testing.T) {
+	advertiser := setupInitializedAdvertiser(t)
+
+	tests := []struct {
+		name         string
+		transactions []*Transaction
+		checkMagic   bool
+		minLen       int
+	}{
+		{
+			name:         "Empty transactions",
+			transactions: []*Transaction{},
+			checkMagic:   true,
+			minLen:       9, // BEEF (4) + version (4) + tx count varint (1)
+		},
+		{
+			name: "Single empty transaction",
+			transactions: []*Transaction{
+				{
+					Version:  1,
+					Inputs:   []TransactionInput{},
+					Outputs:  []TransactionOutput{},
+					LockTime: 0,
+				},
+			},
+			checkMagic: true,
+			minLen:     19, // BEEF header + empty tx
+		},
+		{
+			name: "Multiple transactions",
+			transactions: []*Transaction{
+				{
+					Version:  1,
+					Inputs:   []TransactionInput{},
+					Outputs:  []TransactionOutput{},
+					LockTime: 0,
+				},
+				{
+					Version: 2,
+					Inputs: []TransactionInput{
+						{
+							PreviousOutput: OutPoint{Hash: [32]byte{0x01}, Index: 0},
+							ScriptSig:      []byte{0xaa},
+							Sequence:       0xffffffff,
+						},
+					},
+					Outputs:  []TransactionOutput{},
+					LockTime: 100,
+				},
+			},
+			checkMagic: true,
+			minLen:     60,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := advertiser.encodeTransactionsAsBEEF(tt.transactions)
+
+			// Verify minimum length
+			assert.GreaterOrEqual(t, len(result), tt.minLen, "BEEF data should be at least %d bytes", tt.minLen)
+
+			if tt.checkMagic {
+				// Verify BEEF magic bytes
+				assert.Equal(t, []byte("BEEF"), result[:4], "BEEF data should start with magic bytes")
+
+				// Verify version (0x01000000 little endian)
+				assert.Equal(t, []byte{0x01, 0x00, 0x00, 0x00}, result[4:8], "BEEF should have version 1")
+
+				// Verify transaction count varint
+				txCountVarInt := advertiser.encodeVarInt(uint64(len(tt.transactions)))
+				assert.Equal(t, txCountVarInt, result[8:8+len(txCountVarInt)], "BEEF should have correct transaction count")
+			}
+		})
+	}
+}
+
+func TestWalletAdvertiser_encodeTransaction_Deterministic(t *testing.T) {
+	advertiser := setupInitializedAdvertiser(t)
+
+	tx := &Transaction{
+		Version: 1,
+		Inputs: []TransactionInput{
+			{
+				PreviousOutput: OutPoint{
+					Hash:  [32]byte{0xaa, 0xbb, 0xcc, 0xdd},
+					Index: 5,
+				},
+				ScriptSig: []byte{0x01, 0x02, 0x03, 0x04, 0x05},
+				Sequence:  0xffffffff,
+			},
+		},
+		Outputs: []TransactionOutput{
+			{
+				Value:         12345,
+				LockingScript: []byte{0x76, 0xa9},
+			},
+		},
+		LockTime: 0,
+	}
+
+	// Encode multiple times and verify deterministic output
+	result1 := advertiser.encodeTransaction(tx)
+	result2 := advertiser.encodeTransaction(tx)
+	result3 := advertiser.encodeTransaction(tx)
+
+	assert.Equal(t, result1, result2, "encodeTransaction should be deterministic")
+	assert.Equal(t, result2, result3, "encodeTransaction should be deterministic")
+}
+
+func TestWalletAdvertiser_encodeTransactionsAsBEEF_Deterministic(t *testing.T) {
+	advertiser := setupInitializedAdvertiser(t)
+
+	transactions := []*Transaction{
+		{
+			Version:  1,
+			Inputs:   []TransactionInput{},
+			Outputs:  []TransactionOutput{{Value: 1000, LockingScript: []byte{0x51}}},
+			LockTime: 0,
+		},
+	}
+
+	// Encode multiple times and verify deterministic output
+	result1 := advertiser.encodeTransactionsAsBEEF(transactions)
+	result2 := advertiser.encodeTransactionsAsBEEF(transactions)
+	result3 := advertiser.encodeTransactionsAsBEEF(transactions)
+
+	assert.Equal(t, result1, result2, "encodeTransactionsAsBEEF should be deterministic")
+	assert.Equal(t, result2, result3, "encodeTransactionsAsBEEF should be deterministic")
+}
+
+func TestWalletAdvertiser_encodeTransaction_StructureValidation(t *testing.T) {
+	advertiser := setupInitializedAdvertiser(t)
+
+	// Create a transaction with known values to validate byte-level structure
+	tx := &Transaction{
+		Version: 1,
+		Inputs: []TransactionInput{
+			{
+				PreviousOutput: OutPoint{
+					Hash:  [32]byte{}, // 32 zero bytes
+					Index: 0,
+				},
+				ScriptSig: []byte{},
+				Sequence:  0xffffffff,
+			},
+		},
+		Outputs: []TransactionOutput{
+			{
+				Value:         0,
+				LockingScript: []byte{},
+			},
+		},
+		LockTime: 0,
+	}
+
+	result := advertiser.encodeTransaction(tx)
+
+	// Verify structure:
+	// - Version: 4 bytes (0x01000000)
+	// - Input count: 1 byte (0x01)
+	// - Input: 32 (hash) + 4 (index) + 1 (script len) + 0 (script) + 4 (sequence) = 41 bytes
+	// - Output count: 1 byte (0x01)
+	// - Output: 8 (value) + 1 (script len) + 0 (script) = 9 bytes
+	// - Locktime: 4 bytes (0x00000000)
+	// Total: 4 + 1 + 41 + 1 + 9 + 4 = 60 bytes
+	expectedLen := 60
+	assert.Len(t, result, expectedLen, "transaction should be exactly %d bytes", expectedLen)
+
+	// Verify version (bytes 0-3)
+	assert.Equal(t, []byte{0x01, 0x00, 0x00, 0x00}, result[0:4], "version should be 1")
+
+	// Verify input count (byte 4)
+	assert.Equal(t, byte(0x01), result[4], "input count should be 1")
+
+	// Verify output count (byte 46 = 4 + 1 + 41)
+	assert.Equal(t, byte(0x01), result[46], "output count should be 1")
+
+	// Verify locktime (last 4 bytes)
+	assert.Equal(t, []byte{0x00, 0x00, 0x00, 0x00}, result[56:60], "locktime should be 0")
+}
