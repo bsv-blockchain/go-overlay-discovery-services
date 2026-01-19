@@ -14,8 +14,8 @@ github.com/b-open-io/go-sdk v1.1.25-0.20251001222414-53a8f5db1645 h1:1FX+WSHofn1
 github.com/b-open-io/go-sdk v1.1.25-0.20251001222414-53a8f5db1645/go.mod h1:C1r7iZbRUCbC015GjbhcpwH0jL5ubPn5XaQgjvUaPdU=
 github.com/bsv-blockchain/go-bsv-middleware v0.12.2 h1:T6yWKiGIGjizVEOn0bNrdxG3MuDs2Rxvkf07WiNP9PE=
 github.com/bsv-blockchain/go-bsv-middleware v0.12.2/go.mod h1:SM07pCDldO9Gl7fFp2mxL85zDJOcu8Fcd1J+70Wje4w=
-github.com/bsv-blockchain/go-wallet-toolbox v0.163.1 h1:dc37tONA9OtqR3z3e9QvmZdM3t69/gSVmdPgeK7b1es=
-github.com/bsv-blockchain/go-wallet-toolbox v0.163.1/go.mod h1:plPqdHbKK21SmuIsB+N2Oi2orSEZ4q4vbZs+kSGWh2M=
+github.com/bsv-blockchain/go-wallet-toolbox v0.163.2 h1:KrlUV9F/0g8aFDFhGNLxCMyuE0Qv+BDFEjZc7qynABM=
+github.com/bsv-blockchain/go-wallet-toolbox v0.163.2/go.mod h1:plPqdHbKK21SmuIsB+N2Oi2orSEZ4q4vbZs+kSGWh2M=
 github.com/bsv-blockchain/universal-test-vectors v0.6.1 h1:6mRV8T4ug8456p/rufoDselui3eKY6kr9mRYx8e87Rw=
 github.com/bsv-blockchain/universal-test-vectors v0.6.1/go.mod h1:aNNGIH9aN/aCQ9vw0gTiQiOajkyBQIPJM9O6nHhhF5g=
 github.com/cenkalti/backoff/v4 v4.3.0 h1:MyRJ/UdXutAwSAT+s3wNd7MfTIcy71VQueUuFK343L8=
