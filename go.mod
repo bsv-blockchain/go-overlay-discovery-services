@@ -7,7 +7,7 @@ require (
 	github.com/bsv-blockchain/go-sdk v1.2.15
 	github.com/bsv-blockchain/go-wallet-toolbox v0.165.0
 	github.com/stretchr/testify v1.11.1
-	go.mongodb.org/mongo-driver v1.17.7
+	go.mongodb.org/mongo-driver v1.17.8
 )
 
 replace github.com/bsv-blockchain/go-overlay-services => github.com/b-open-io/go-overlay-services v0.0.0-20251001220929-549d62165551
