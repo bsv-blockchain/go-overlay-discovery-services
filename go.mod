@@ -12,7 +12,7 @@ require (
 
 replace github.com/bsv-blockchain/go-overlay-services => github.com/b-open-io/go-overlay-services v0.0.0-20251001220929-549d62165551
 
-replace github.com/bsv-blockchain/go-sdk => github.com/b-open-io/go-sdk v1.1.25-0.20251001222414-53a8f5db1645
+replace github.com/bsv-blockchain/go-sdk => github.com/b-open-io/go-sdk v1.1.25-0.20251205183115-5707ed705bad
 
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
