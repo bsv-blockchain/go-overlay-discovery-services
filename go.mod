@@ -15,6 +15,8 @@ replace github.com/bsv-blockchain/go-overlay-services => github.com/b-open-io/go
 replace github.com/bsv-blockchain/go-sdk => github.com/b-open-io/go-sdk v1.1.25-0.20251205183115-5707ed705bad
 
 // Security: upgrade vulnerable dependencies
+replace github.com/gofiber/fiber/v2 => github.com/gofiber/fiber/v2 v2.52.11
+
 replace github.com/opencontainers/runc => github.com/opencontainers/runc v1.4.0
 
 replace go.opentelemetry.io/otel/sdk => go.opentelemetry.io/otel/sdk v1.40.0
