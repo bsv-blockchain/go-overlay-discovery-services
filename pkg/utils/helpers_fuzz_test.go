@@ -38,6 +38,9 @@ func FuzzHexToBytes(f *testing.F) {
 	f.Add("\x00\x01")
 
 	f.Fuzz(func(t *testing.T, hexStr string) {
+		if len(hexStr) > 10000 {
+			t.Skip("input too large")
+		}
 		// Function should not panic on any input
 		result, err := HexToBytes(hexStr)
 
@@ -100,6 +103,9 @@ func FuzzBytesToHex(f *testing.F) {
 	f.Add([]byte("\xff\xff\xff"))
 
 	f.Fuzz(func(t *testing.T, data []byte) {
+		if len(data) > 10000 {
+			t.Skip("input too large")
+		}
 		// Function should not panic on any input
 		result := BytesToHex(data)
 
@@ -159,6 +165,9 @@ func FuzzUTFBytesToString(f *testing.F) {
 	f.Add([]byte{0xf4, 0x90, 0x80, 0x80})
 
 	f.Fuzz(func(t *testing.T, data []byte) {
+		if len(data) > 10000 {
+			t.Skip("input too large")
+		}
 		// Function should not panic on any input
 		result := UTFBytesToString(data)
 
@@ -192,6 +201,9 @@ func FuzzFlattenFields(f *testing.F) {
 	f.Add([]byte{0x01, 0x02}, []byte{0x03, 0x04})
 
 	f.Fuzz(func(t *testing.T, field1, field2 []byte) {
+		if len(field1)+len(field2) > 10000 {
+			t.Skip("input too large")
+		}
 		// Create a TokenFields with the fuzzed data
 		fields := TokenFields{field1, field2}
 

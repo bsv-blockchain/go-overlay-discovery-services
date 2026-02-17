@@ -3,16 +3,12 @@ module github.com/bsv-blockchain/go-overlay-discovery-services
 go 1.25.4
 
 require (
-	github.com/bsv-blockchain/go-overlay-services v1.2.3
+	github.com/bsv-blockchain/go-overlay-services v1.2.4
 	github.com/bsv-blockchain/go-sdk v1.2.17
 	github.com/bsv-blockchain/go-wallet-toolbox v0.172.1
 	github.com/stretchr/testify v1.11.1
 	go.mongodb.org/mongo-driver v1.17.9
 )
-
-replace github.com/bsv-blockchain/go-overlay-services => github.com/b-open-io/go-overlay-services v0.0.0-20251001220929-549d62165551
-
-replace github.com/bsv-blockchain/go-sdk => github.com/b-open-io/go-sdk v1.1.25-0.20251205183115-5707ed705bad
 
 // Security: upgrade vulnerable dependencies
 replace github.com/gofiber/fiber/v2 => github.com/gofiber/fiber/v2 v2.52.11

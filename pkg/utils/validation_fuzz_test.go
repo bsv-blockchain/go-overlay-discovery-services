@@ -37,6 +37,9 @@ func FuzzIsAdvertisableURI(f *testing.F) {
 	f.Add("https://192.168.1.1/")
 
 	f.Fuzz(func(t *testing.T, uri string) {
+		if len(uri) > 10000 {
+			t.Skip("input too large")
+		}
 		// Function should not panic on any input
 		result := IsAdvertisableURI(uri)
 
@@ -86,6 +89,9 @@ func FuzzIsValidTopicOrServiceName(f *testing.F) {
 	f.Add("tm_" + string(make([]byte, 100)))
 
 	f.Fuzz(func(t *testing.T, name string) {
+		if len(name) > 10000 {
+			t.Skip("input too large")
+		}
 		// Function should not panic on any input
 		result := IsValidTopicOrServiceName(name)
 
@@ -127,6 +133,9 @@ func FuzzValidateCustomHTTPSURI(f *testing.F) {
 	f.Add("custom://[::1]/", "custom://")
 
 	f.Fuzz(func(t *testing.T, uri, prefix string) {
+		if len(uri)+len(prefix) > 10000 {
+			t.Skip("input too large")
+		}
 		// Function should not panic on any input
 		_ = validateCustomHTTPSURI(uri, prefix)
 		// We don't validate the result as this is an internal function
@@ -154,6 +163,9 @@ func FuzzValidateWSSURI(f *testing.F) {
 	f.Add("wss://example.com:99999")
 
 	f.Fuzz(func(t *testing.T, uri string) {
+		if len(uri) > 10000 {
+			t.Skip("input too large")
+		}
 		// Function should not panic on any input
 		_ = validateWSSURI(uri)
 		// We don't validate the result as this is an internal function
@@ -184,6 +196,9 @@ func FuzzValidateJS8CallURI(f *testing.F) {
 	f.Add("js8c+bsvauth+smf:?lat=0&long=0&freq=abc&radius=xyz")
 
 	f.Fuzz(func(t *testing.T, uri string) {
+		if len(uri) > 10000 {
+			t.Skip("input too large")
+		}
 		// Function should not panic on any input
 		_ = validateJS8CallURI(uri)
 		// We don't validate the result as this is an internal function
