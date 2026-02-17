@@ -3,16 +3,12 @@ module github.com/bsv-blockchain/go-overlay-discovery-services
 go 1.25.4
 
 require (
-	github.com/bsv-blockchain/go-overlay-services v1.2.3
+	github.com/bsv-blockchain/go-overlay-services v1.2.4
 	github.com/bsv-blockchain/go-sdk v1.2.17
-	github.com/bsv-blockchain/go-wallet-toolbox v0.170.0
+	github.com/bsv-blockchain/go-wallet-toolbox v0.172.1
 	github.com/stretchr/testify v1.11.1
 	go.mongodb.org/mongo-driver v1.17.9
 )
-
-replace github.com/bsv-blockchain/go-overlay-services => github.com/b-open-io/go-overlay-services v0.0.0-20251001220929-549d62165551
-
-replace github.com/bsv-blockchain/go-sdk => github.com/b-open-io/go-sdk v1.1.25-0.20251205183115-5707ed705bad
 
 // Security: upgrade vulnerable dependencies
 replace github.com/gofiber/fiber/v2 => github.com/gofiber/fiber/v2 v2.52.11
@@ -49,15 +45,15 @@ require (
 	github.com/benbjohnson/clock v1.3.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bsv-blockchain/go-batcher v1.2.7 // indirect
-	github.com/bsv-blockchain/go-bsv-middleware v0.12.3 // indirect
+	github.com/bsv-blockchain/go-bsv-middleware v0.12.4 // indirect
 	github.com/bsv-blockchain/go-bt/v2 v2.5.3 // indirect
 	github.com/bsv-blockchain/go-chaincfg v1.5.4 // indirect
-	github.com/bsv-blockchain/go-chaintracks v1.1.0 // indirect
+	github.com/bsv-blockchain/go-chaintracks v1.1.1 // indirect
 	github.com/bsv-blockchain/go-lockfree-queue v1.1.2 // indirect
-	github.com/bsv-blockchain/go-p2p-message-bus v0.1.8 // indirect
+	github.com/bsv-blockchain/go-p2p-message-bus v0.1.9 // indirect
 	github.com/bsv-blockchain/go-safe-conversion v1.1.2 // indirect
 	github.com/bsv-blockchain/go-subtree v1.1.8 // indirect
-	github.com/bsv-blockchain/go-teranode-p2p-client v0.1.0 // indirect
+	github.com/bsv-blockchain/go-teranode-p2p-client v0.1.1 // indirect
 	github.com/bsv-blockchain/go-tx-map v1.3.2 // indirect
 	github.com/bsv-blockchain/go-wire v1.1.3 // indirect
 	github.com/bsv-blockchain/teranode v0.13.2 // indirect
@@ -172,7 +168,7 @@ require (
 	github.com/marten-seemann/tcp v0.0.0-20210406111302-dfbc87cc63fd // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/mattn/go-sqlite3 v1.14.33 // indirect
+	github.com/mattn/go-sqlite3 v1.14.34 // indirect
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
 	github.com/miekg/dns v1.1.72 // indirect
 	github.com/mikioh/tcpinfo v0.0.0-20190314235526-30a79bb1804b // indirect
@@ -202,7 +198,7 @@ require (
 	github.com/pierrec/lz4/v4 v4.1.25 // indirect
 	github.com/pion/datachannel v1.6.0 // indirect
 	github.com/pion/dtls/v2 v2.2.12 // indirect
-	github.com/pion/dtls/v3 v3.0.11 // indirect
+	github.com/pion/dtls/v3 v3.1.0 // indirect
 	github.com/pion/ice/v4 v4.2.0 // indirect
 	github.com/pion/interceptor v0.1.44 // indirect
 	github.com/pion/logging v0.2.4 // indirect

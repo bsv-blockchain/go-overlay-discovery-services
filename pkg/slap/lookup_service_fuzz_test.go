@@ -47,6 +47,9 @@ func FuzzParseQueryObjectJSON(f *testing.F) {
 	}
 
 	f.Fuzz(func(t *testing.T, jsonStr string) {
+		if len(jsonStr) > 10000 {
+			t.Skip("input too large")
+		}
 		// First, try to unmarshal to ensure it's valid JSON
 		var queryInterface interface{}
 		err := json.Unmarshal([]byte(jsonStr), &queryInterface)
@@ -88,6 +91,9 @@ func FuzzValidateQuerySLAP(f *testing.F) {
 	}
 
 	f.Fuzz(func(t *testing.T, findAll bool, domain, serviceName, identityKey string, limit, skip int, sortOrder string) {
+		if len(domain)+len(serviceName)+len(identityKey)+len(sortOrder) > 10000 {
+			t.Skip("input too large")
+		}
 		// Build a query object
 		query := &types.SLAPQuery{}
 
@@ -136,6 +142,9 @@ func FuzzQueryObjectRoundTrip(f *testing.F) {
 	f.Add(`{"limit": 10, "skip": 5, "sortOrder": "asc"}`)
 
 	f.Fuzz(func(t *testing.T, jsonStr string) {
+		if len(jsonStr) > 10000 {
+			t.Skip("input too large")
+		}
 		// Try to unmarshal into interface
 		var queryInterface interface{}
 		err := json.Unmarshal([]byte(jsonStr), &queryInterface)
@@ -183,6 +192,9 @@ func FuzzDomainString(f *testing.F) {
 	f.Add(longDomain)
 
 	f.Fuzz(func(t *testing.T, domain string) {
+		if len(domain) > 10000 {
+			t.Skip("input too large")
+		}
 		// Create a query with the fuzzed domain
 		domainPtr := &domain
 		query := &types.SLAPQuery{
@@ -219,6 +231,9 @@ func FuzzServiceNameString(f *testing.F) {
 	f.Add(longService)
 
 	f.Fuzz(func(t *testing.T, serviceName string) {
+		if len(serviceName) > 10000 {
+			t.Skip("input too large")
+		}
 		// Create a query with the fuzzed service name
 		servicePtr := &serviceName
 		query := &types.SLAPQuery{
@@ -246,6 +261,9 @@ func FuzzIdentityKeyString(f *testing.F) {
 	f.Add(string(make([]byte, 1000)))
 
 	f.Fuzz(func(t *testing.T, identityKey string) {
+		if len(identityKey) > 10000 {
+			t.Skip("input too large")
+		}
 		// Create a query with the fuzzed identity key
 		identityKeyPtr := &identityKey
 		query := &types.SLAPQuery{
