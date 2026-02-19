@@ -18,7 +18,7 @@ replace github.com/opencontainers/runc => github.com/opencontainers/runc v1.4.0
 replace go.opentelemetry.io/otel/sdk => go.opentelemetry.io/otel/sdk v1.40.0
 
 require (
-	filippo.io/edwards25519 v1.1.0 // indirect
+	filippo.io/edwards25519 v1.1.1 // indirect
 	github.com/DATA-DOG/go-sqlmock v1.5.2 // indirect
 	github.com/IBM/sarama v1.46.3 // indirect
 	github.com/aerospike/aerospike-client-go/v8 v8.5.1 // indirect
