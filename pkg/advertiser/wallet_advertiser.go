@@ -658,7 +658,7 @@ func (w *WalletAdvertiser) validateStorageConnectivity() error {
 		return fmt.Errorf("failed to create HTTP request: %w", err)
 	}
 
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) //nolint:gosec // G704: URL is constructed from validated storageURL configuration
 	if err != nil {
 		// If /health doesn't exist, try a simple HEAD request to the base URL
 		req, err := http.NewRequestWithContext(ctx, http.MethodHead, w.storageURL, nil)
@@ -666,7 +666,7 @@ func (w *WalletAdvertiser) validateStorageConnectivity() error {
 			return fmt.Errorf("failed to create HTTP request: %w", err)
 		}
 
-		resp, err = client.Do(req)
+		resp, err = client.Do(req) //nolint:gosec // G704: URL is constructed from validated storageURL configuration
 		if err != nil {
 			return fmt.Errorf("storage URL is not reachable: %w", err)
 		}
@@ -796,27 +796,27 @@ func (w *WalletAdvertiser) encodeVarInt(value uint64) []byte {
 		return []byte{byte(value)}
 	}
 	if value <= 0xffff {
-		return []byte{0xfd, byte(value), byte(value >> 8)}
+		return []byte{0xfd, byte(value), byte(value >> 8)} //nolint:gosec // G115: intentional byte extraction for Bitcoin varint encoding
 	}
 	if value <= 0xffffffff {
-		return []byte{0xfe, byte(value), byte(value >> 8), byte(value >> 16), byte(value >> 24)}
+		return []byte{0xfe, byte(value), byte(value >> 8), byte(value >> 16), byte(value >> 24)} //nolint:gosec // G115: intentional byte extraction for Bitcoin varint encoding
 	}
 	return []byte{
-		0xff, byte(value), byte(value >> 8), byte(value >> 16), byte(value >> 24),
-		byte(value >> 32), byte(value >> 40), byte(value >> 48), byte(value >> 56),
+		0xff, byte(value), byte(value >> 8), byte(value >> 16), byte(value >> 24), //nolint:gosec // G115: intentional byte extraction for Bitcoin varint encoding
+		byte(value >> 32), byte(value >> 40), byte(value >> 48), byte(value >> 56), //nolint:gosec // G115: intentional byte extraction for Bitcoin varint encoding
 	}
 }
 
 // encodeUint32 encodes a 32-bit unsigned integer in little endian format
 func (w *WalletAdvertiser) encodeUint32(value uint32) []byte {
-	return []byte{byte(value), byte(value >> 8), byte(value >> 16), byte(value >> 24)}
+	return []byte{byte(value), byte(value >> 8), byte(value >> 16), byte(value >> 24)} //nolint:gosec // G115: intentional byte extraction for little-endian encoding
 }
 
 // encodeUint64 encodes a 64-bit unsigned integer in little endian format
 func (w *WalletAdvertiser) encodeUint64(value uint64) []byte {
 	return []byte{
-		byte(value), byte(value >> 8), byte(value >> 16), byte(value >> 24),
-		byte(value >> 32), byte(value >> 40), byte(value >> 48), byte(value >> 56),
+		byte(value), byte(value >> 8), byte(value >> 16), byte(value >> 24), //nolint:gosec // G115: intentional byte extraction for little-endian encoding
+		byte(value >> 32), byte(value >> 40), byte(value >> 48), byte(value >> 56), //nolint:gosec // G115: intentional byte extraction for little-endian encoding
 	}
 }
 
@@ -1066,8 +1066,8 @@ func (w *WalletAdvertiser) calculateTransactionHash(tx *Transaction) [32]byte {
 
 	// Simple deterministic hash based on version and input/output counts
 	hashData := []byte{
-		byte(tx.Version), byte(tx.Version >> 8), byte(tx.Version >> 16), byte(tx.Version >> 24),
-		byte(len(tx.Inputs)), byte(len(tx.Outputs)),
+		byte(tx.Version), byte(tx.Version >> 8), byte(tx.Version >> 16), byte(tx.Version >> 24), //nolint:gosec // G115: intentional byte extraction for hash computation
+		byte(len(tx.Inputs)), byte(len(tx.Outputs)), //nolint:gosec // G115: intentional byte extraction for hash computation
 	}
 
 	// Pad to 32 bytes
