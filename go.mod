@@ -11,7 +11,7 @@ require (
 )
 
 // Security: upgrade vulnerable dependencies
-replace github.com/gofiber/fiber/v2 => github.com/gofiber/fiber/v2 v2.52.11
+replace github.com/gofiber/fiber/v2 => github.com/gofiber/fiber/v2 v2.52.12
 
 replace github.com/opencontainers/runc => github.com/opencontainers/runc v1.4.0
 
