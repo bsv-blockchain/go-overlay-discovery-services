@@ -658,7 +658,7 @@ func (w *WalletAdvertiser) validateStorageConnectivity() error {
 		return fmt.Errorf("failed to create HTTP request: %w", err)
 	}
 
-	resp, err := client.Do(req) //nolint:gosec // G704: URL is constructed from validated storageURL configuration
+	resp, err := client.Do(req)
 	if err != nil {
 		// If /health doesn't exist, try a simple HEAD request to the base URL
 		req, err := http.NewRequestWithContext(ctx, http.MethodHead, w.storageURL, nil)
@@ -666,7 +666,7 @@ func (w *WalletAdvertiser) validateStorageConnectivity() error {
 			return fmt.Errorf("failed to create HTTP request: %w", err)
 		}
 
-		resp, err = client.Do(req) //nolint:gosec // G704: URL is constructed from validated storageURL configuration
+		resp, err = client.Do(req)
 		if err != nil {
 			return fmt.Errorf("storage URL is not reachable: %w", err)
 		}
