@@ -28,12 +28,8 @@ func TestIsTokenSignatureCorrectlyLinked(t *testing.T) {
 		require.NoError(t, err)
 
 		// Prepare the token fields
-		fields := TokenFields{
-			[]byte("SHIP"),
-			identityKeyResult.PublicKey.ToDER(),
-			[]byte("https://domain.com"),
-			[]byte("tm_meter"),
-		}
+		fields := make(TokenFields, 0, 5)
+		fields = append(fields, []byte("SHIP"), identityKeyResult.PublicKey.ToDER(), []byte("https://domain.com"), []byte("tm_meter"))
 
 		// Flatten fields for signing (all except signature)
 		data := flattenFields(fields)
@@ -92,12 +88,8 @@ func TestIsTokenSignatureCorrectlyLinked(t *testing.T) {
 		require.NoError(t, err)
 
 		// Prepare the token fields
-		fields := TokenFields{
-			[]byte("SLAP"),
-			identityKeyResult.PublicKey.ToDER(),
-			[]byte("https://domain.com"),
-			[]byte("tm_meter"),
-		}
+		fields := make(TokenFields, 0, 5)
+		fields = append(fields, []byte("SLAP"), identityKeyResult.PublicKey.ToDER(), []byte("https://domain.com"), []byte("tm_meter"))
 
 		// Flatten fields for signing (all except signature)
 		data := flattenFields(fields)
@@ -156,12 +148,8 @@ func TestIsTokenSignatureCorrectlyLinked(t *testing.T) {
 		require.NoError(t, err)
 
 		// Prepare the token fields
-		fields := TokenFields{
-			[]byte("SHIP"),
-			identityKeyResult.PublicKey.ToDER(),
-			[]byte("https://domain.com"),
-			[]byte("tm_meter"),
-		}
+		fields := make(TokenFields, 0, 5)
+		fields = append(fields, []byte("SHIP"), identityKeyResult.PublicKey.ToDER(), []byte("https://domain.com"), []byte("tm_meter"))
 
 		// Flatten fields for signing
 		data := flattenFields(fields)
@@ -230,12 +218,8 @@ func TestIsTokenSignatureCorrectlyLinked(t *testing.T) {
 		require.NoError(t, err)
 
 		// Prepare the token fields with imposter's identity
-		fields := TokenFields{
-			[]byte("SHIP"),
-			imposterIdentityResult.PublicKey.ToDER(), // Claiming to be someone else
-			[]byte("https://domain.com"),
-			[]byte("tm_meter"),
-		}
+		fields := make(TokenFields, 0, 5)
+		fields = append(fields, []byte("SHIP"), imposterIdentityResult.PublicKey.ToDER(), []byte("https://domain.com"), []byte("tm_meter")) // Claiming to be someone else
 
 		// Flatten fields for signing
 		data := flattenFields(fields)
