@@ -11,257 +11,103 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// signedTokenFixture creates a signed token with the given protocol and returns
+// the fields (with signature appended) and the locking public key hex.
+func signedTokenFixture(t *testing.T, ctx context.Context, signerWallet *wallet.Wallet, protocol string, protocolID overlay.ProtocolID, identityDER []byte) (TokenFields, string) {
+	t.Helper()
+	fields := make(TokenFields, 0, 5)
+	fields = append(fields, []byte(protocol), identityDER, []byte("https://domain.com"), []byte("tm_meter"))
+	data := flattenFields(fields)
+
+	sigResult, err := signerWallet.CreateSignature(ctx, wallet.CreateSignatureArgs{
+		EncryptionArgs: wallet.EncryptionArgs{
+			ProtocolID: wallet.Protocol{
+				SecurityLevel: wallet.SecurityLevelEveryAppAndCounterparty,
+				Protocol:      string(protocolID),
+			},
+			KeyID:        "1",
+			Counterparty: wallet.Counterparty{Type: wallet.CounterpartyTypeAnyone},
+		},
+		Data: data,
+	}, "")
+	require.NoError(t, err)
+
+	sigDER, err := sigResult.Signature.ToDER()
+	require.NoError(t, err)
+	fields = append(fields, sigDER)
+
+	forSelfTrue := true
+	pubKeyResult, err := signerWallet.GetPublicKey(ctx, wallet.GetPublicKeyArgs{
+		EncryptionArgs: wallet.EncryptionArgs{
+			ProtocolID: wallet.Protocol{
+				SecurityLevel: wallet.SecurityLevelEveryAppAndCounterparty,
+				Protocol:      string(protocolID),
+			},
+			KeyID:        "1",
+			Counterparty: wallet.Counterparty{Type: wallet.CounterpartyTypeAnyone},
+		},
+		ForSelf: &forSelfTrue,
+	}, "")
+	require.NoError(t, err)
+
+	return fields, pubKeyResult.PublicKey.ToDERHex()
+}
+
+// newTestWallet creates a new wallet and returns it along with its identity key DER bytes.
+func newTestWallet(t *testing.T, ctx context.Context) (*wallet.Wallet, []byte) {
+	t.Helper()
+	key, err := ec.NewPrivateKey()
+	require.NoError(t, err)
+	w, err := wallet.NewWallet(key)
+	require.NoError(t, err)
+	idResult, err := w.GetPublicKey(ctx, wallet.GetPublicKeyArgs{IdentityKey: true}, "")
+	require.NoError(t, err)
+	return w, idResult.PublicKey.ToDER()
+}
+
 func TestIsTokenSignatureCorrectlyLinked(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("validates a correctly-linked SHIP signature", func(t *testing.T) {
-		// Create a signer wallet
-		signerKey, err := ec.NewPrivateKey()
-		require.NoError(t, err)
-		signerWallet, err := wallet.NewWallet(signerKey)
-		require.NoError(t, err)
+		signerWallet, identityDER := newTestWallet(t, ctx)
+		fields, pubKeyHex := signedTokenFixture(t, ctx, signerWallet, "SHIP", overlay.ProtocolIDSHIP, identityDER)
 
-		// Get the signer's identity key
-		identityKeyResult, err := signerWallet.GetPublicKey(ctx, wallet.GetPublicKeyArgs{
-			IdentityKey: true,
-		}, "")
-		require.NoError(t, err)
-
-		// Prepare the token fields
-		fields := make(TokenFields, 0, 5)
-		fields = append(fields, []byte("SHIP"), identityKeyResult.PublicKey.ToDER(), []byte("https://domain.com"), []byte("tm_meter"))
-
-		// Flatten fields for signing (all except signature)
-		data := flattenFields(fields)
-
-		// Create the signature
-		sigResult, err := signerWallet.CreateSignature(ctx, wallet.CreateSignatureArgs{
-			EncryptionArgs: wallet.EncryptionArgs{
-				ProtocolID: wallet.Protocol{
-					SecurityLevel: wallet.SecurityLevelEveryAppAndCounterparty,
-					Protocol:      string(overlay.ProtocolIDSHIP),
-				},
-				KeyID:        "1",
-				Counterparty: wallet.Counterparty{Type: wallet.CounterpartyTypeAnyone},
-			},
-			Data: data,
-		}, "")
-		require.NoError(t, err)
-
-		// Add signature to fields
-		sigDER, err := sigResult.Signature.ToDER()
-		require.NoError(t, err)
-		fields = append(fields, sigDER)
-
-		// Get the public key for verification
-		forSelfTrue := true
-		pubKeyResult, err := signerWallet.GetPublicKey(ctx, wallet.GetPublicKeyArgs{
-			EncryptionArgs: wallet.EncryptionArgs{
-				ProtocolID: wallet.Protocol{
-					SecurityLevel: wallet.SecurityLevelEveryAppAndCounterparty,
-					Protocol:      string(overlay.ProtocolIDSHIP),
-				},
-				KeyID:        "1",
-				Counterparty: wallet.Counterparty{Type: wallet.CounterpartyTypeAnyone},
-			},
-			ForSelf: &forSelfTrue,
-		}, "")
-		require.NoError(t, err)
-
-		// Verify the signature
-		valid, err := IsTokenSignatureCorrectlyLinked(ctx, pubKeyResult.PublicKey.ToDERHex(), fields)
+		valid, err := IsTokenSignatureCorrectlyLinked(ctx, pubKeyHex, fields)
 		require.NoError(t, err)
 		require.True(t, valid)
 	})
 
 	t.Run("validates a correctly-linked SLAP signature", func(t *testing.T) {
-		// Create a signer wallet
-		signerKey, err := ec.NewPrivateKey()
-		require.NoError(t, err)
-		signerWallet, err := wallet.NewWallet(signerKey)
-		require.NoError(t, err)
+		signerWallet, identityDER := newTestWallet(t, ctx)
+		fields, pubKeyHex := signedTokenFixture(t, ctx, signerWallet, "SLAP", overlay.ProtocolIDSLAP, identityDER)
 
-		// Get the signer's identity key
-		identityKeyResult, err := signerWallet.GetPublicKey(ctx, wallet.GetPublicKeyArgs{
-			IdentityKey: true,
-		}, "")
-		require.NoError(t, err)
-
-		// Prepare the token fields
-		fields := make(TokenFields, 0, 5)
-		fields = append(fields, []byte("SLAP"), identityKeyResult.PublicKey.ToDER(), []byte("https://domain.com"), []byte("tm_meter"))
-
-		// Flatten fields for signing (all except signature)
-		data := flattenFields(fields)
-
-		// Create the signature
-		sigResult, err := signerWallet.CreateSignature(ctx, wallet.CreateSignatureArgs{
-			EncryptionArgs: wallet.EncryptionArgs{
-				ProtocolID: wallet.Protocol{
-					SecurityLevel: wallet.SecurityLevelEveryAppAndCounterparty,
-					Protocol:      string(overlay.ProtocolIDSLAP),
-				},
-				KeyID:        "1",
-				Counterparty: wallet.Counterparty{Type: wallet.CounterpartyTypeAnyone},
-			},
-			Data: data,
-		}, "")
-		require.NoError(t, err)
-
-		// Add signature to fields
-		sigDER, err := sigResult.Signature.ToDER()
-		require.NoError(t, err)
-		fields = append(fields, sigDER)
-
-		// Get the public key for verification
-		forSelfTrue := true
-		pubKeyResult, err := signerWallet.GetPublicKey(ctx, wallet.GetPublicKeyArgs{
-			EncryptionArgs: wallet.EncryptionArgs{
-				ProtocolID: wallet.Protocol{
-					SecurityLevel: wallet.SecurityLevelEveryAppAndCounterparty,
-					Protocol:      string(overlay.ProtocolIDSLAP),
-				},
-				KeyID:        "1",
-				Counterparty: wallet.Counterparty{Type: wallet.CounterpartyTypeAnyone},
-			},
-			ForSelf: &forSelfTrue,
-		}, "")
-		require.NoError(t, err)
-
-		// Verify the signature
-		valid, err := IsTokenSignatureCorrectlyLinked(ctx, pubKeyResult.PublicKey.ToDERHex(), fields)
+		valid, err := IsTokenSignatureCorrectlyLinked(ctx, pubKeyHex, fields)
 		require.NoError(t, err)
 		require.True(t, valid)
 	})
 
 	t.Run("fails to validate signature over tampered data", func(t *testing.T) {
-		// Create a signer wallet
-		signerKey, err := ec.NewPrivateKey()
-		require.NoError(t, err)
-		signerWallet, err := wallet.NewWallet(signerKey)
-		require.NoError(t, err)
+		signerWallet, identityDER := newTestWallet(t, ctx)
+		fields, pubKeyHex := signedTokenFixture(t, ctx, signerWallet, "SHIP", overlay.ProtocolIDSHIP, identityDER)
 
-		// Get the signer's identity key
-		identityKeyResult, err := signerWallet.GetPublicKey(ctx, wallet.GetPublicKeyArgs{
-			IdentityKey: true,
-		}, "")
-		require.NoError(t, err)
-
-		// Prepare the token fields
-		fields := make(TokenFields, 0, 5)
-		fields = append(fields, []byte("SHIP"), identityKeyResult.PublicKey.ToDER(), []byte("https://domain.com"), []byte("tm_meter"))
-
-		// Flatten fields for signing
-		data := flattenFields(fields)
-
-		// Create the signature
-		sigResult, err := signerWallet.CreateSignature(ctx, wallet.CreateSignatureArgs{
-			EncryptionArgs: wallet.EncryptionArgs{
-				ProtocolID: wallet.Protocol{
-					SecurityLevel: wallet.SecurityLevelEveryAppAndCounterparty,
-					Protocol:      string(overlay.ProtocolIDSHIP),
-				},
-				KeyID:        "1",
-				Counterparty: wallet.Counterparty{Type: wallet.CounterpartyTypeAnyone},
-			},
-			Data: data,
-		}, "")
-		require.NoError(t, err)
-
-		// Tamper with the fields after signing
+		// Tamper with the protocol field after signing
 		fields[0] = []byte("SLAP")
 
-		// Add signature to fields
-		sigDER, err := sigResult.Signature.ToDER()
+		valid, err := IsTokenSignatureCorrectlyLinked(ctx, pubKeyHex, fields)
 		require.NoError(t, err)
-		fields = append(fields, sigDER)
-
-		// Get the public key for verification
-		forSelfTrue := true
-		pubKeyResult, err := signerWallet.GetPublicKey(ctx, wallet.GetPublicKeyArgs{
-			EncryptionArgs: wallet.EncryptionArgs{
-				ProtocolID: wallet.Protocol{
-					SecurityLevel: wallet.SecurityLevelEveryAppAndCounterparty,
-					Protocol:      string(overlay.ProtocolIDSHIP),
-				},
-				KeyID:        "1",
-				Counterparty: wallet.Counterparty{Type: wallet.CounterpartyTypeAnyone},
-			},
-			ForSelf: &forSelfTrue,
-		}, "")
-		require.NoError(t, err)
-
-		// Verify the signature - should fail due to tampered data
-		// The signature will be invalid because the protocol was changed after signing
-		valid, err := IsTokenSignatureCorrectlyLinked(ctx, pubKeyResult.PublicKey.ToDERHex(), fields)
-		require.NoError(t, err) // No technical error, just invalid signature
-		require.False(t, valid) // Should be false due to tampered data
+		require.False(t, valid)
 	})
 
 	t.Run("fails if claimed identity key is incorrect", func(t *testing.T) {
-		// Create the actual signer wallet
-		signerKey, err := ec.NewPrivateKey()
-		require.NoError(t, err)
-		signerWallet, err := wallet.NewWallet(signerKey)
-		require.NoError(t, err)
+		signerWallet, _ := newTestWallet(t, ctx)
+		_, imposterIdentityDER := newTestWallet(t, ctx)
 
-		// Create a different wallet whose identity we'll falsely claim
-		imposterKey, err := ec.NewPrivateKey()
+		// Sign with signer's key but claim imposter's identity
+		fields, pubKeyHex := signedTokenFixture(t, ctx, signerWallet, "SHIP", overlay.ProtocolIDSHIP, imposterIdentityDER)
+
+		valid, err := IsTokenSignatureCorrectlyLinked(ctx, pubKeyHex, fields)
 		require.NoError(t, err)
-		imposterWallet, err := wallet.NewWallet(imposterKey)
-		require.NoError(t, err)
-
-		// Get the imposter's identity key (we'll falsely claim this)
-		imposterIdentityResult, err := imposterWallet.GetPublicKey(ctx, wallet.GetPublicKeyArgs{
-			IdentityKey: true,
-		}, "")
-		require.NoError(t, err)
-
-		// Prepare the token fields with imposter's identity
-		fields := make(TokenFields, 0, 5)
-		fields = append(fields, []byte("SHIP"), imposterIdentityResult.PublicKey.ToDER(), []byte("https://domain.com"), []byte("tm_meter")) // Claiming to be someone else
-
-		// Flatten fields for signing
-		data := flattenFields(fields)
-
-		// Create the signature with the actual signer's key
-		sigResult, err := signerWallet.CreateSignature(ctx, wallet.CreateSignatureArgs{
-			EncryptionArgs: wallet.EncryptionArgs{
-				ProtocolID: wallet.Protocol{
-					SecurityLevel: wallet.SecurityLevelEveryAppAndCounterparty,
-					Protocol:      string(overlay.ProtocolIDSHIP),
-				},
-				KeyID:        "1",
-				Counterparty: wallet.Counterparty{Type: wallet.CounterpartyTypeAnyone},
-			},
-			Data: data,
-		}, "")
-		require.NoError(t, err)
-
-		// Add signature to fields
-		sigDER, err := sigResult.Signature.ToDER()
-		require.NoError(t, err)
-		fields = append(fields, sigDER)
-
-		// Get the public key for verification (from actual signer)
-		forSelfTrue := true
-		pubKeyResult, err := signerWallet.GetPublicKey(ctx, wallet.GetPublicKeyArgs{
-			EncryptionArgs: wallet.EncryptionArgs{
-				ProtocolID: wallet.Protocol{
-					SecurityLevel: wallet.SecurityLevelEveryAppAndCounterparty,
-					Protocol:      string(overlay.ProtocolIDSHIP),
-				},
-				KeyID:        "1",
-				Counterparty: wallet.Counterparty{Type: wallet.CounterpartyTypeAnyone},
-			},
-			ForSelf: &forSelfTrue,
-		}, "")
-		require.NoError(t, err)
-
-		// Verify the signature - should fail because identity key doesn't match
-		valid, err := IsTokenSignatureCorrectlyLinked(ctx, pubKeyResult.PublicKey.ToDERHex(), fields)
-		require.NoError(t, err) // No error, just invalid
-		require.False(t, valid) // Should be false due to identity mismatch
+		require.False(t, valid)
 	})
 
 	t.Run("fails with insufficient fields", func(t *testing.T) {

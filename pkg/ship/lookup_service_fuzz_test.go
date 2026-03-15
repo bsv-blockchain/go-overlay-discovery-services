@@ -175,7 +175,7 @@ func FuzzDomainString(f *testing.F) {
 	f.Add("example.com")
 	f.Add("sub.example.com")
 	f.Add("example.com:8080")
-	f.Add("192.168.1.1")
+	f.Add("198.51.100.1")
 	f.Add("localhost")
 	f.Add("[::1]")
 	f.Add("")

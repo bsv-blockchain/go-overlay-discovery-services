@@ -11,6 +11,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
+	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/shared"
 	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
 )
 
@@ -122,29 +123,8 @@ func (s *Storage) FindRecord(ctx context.Context, query types.SHIPQuery) ([]type
 
 	// Set up the find options
 	findOpts := options.Find()
-
-	// Set projection to return only txid, outputIndex, and createdAt
-	findOpts.SetProjection(bson.M{
-		"txid":        1,
-		"outputIndex": 1,
-		"createdAt":   1,
-	})
-
-	// Set sort order (default to descending by createdAt)
-	sortOrder := -1 // descending
-	if query.SortOrder != nil && *query.SortOrder == types.SortOrderAsc {
-		sortOrder = 1 // ascending
-	}
-	findOpts.SetSort(bson.M{"createdAt": sortOrder})
-
-	// Apply pagination
-	if query.Skip != nil && *query.Skip > 0 {
-		findOpts.SetSkip(int64(*query.Skip))
-	}
-
-	if query.Limit != nil && *query.Limit > 0 {
-		findOpts.SetLimit(int64(*query.Limit))
-	}
+	findOpts.SetProjection(shared.UTXOProjection)
+	shared.ApplyPaginationOpts(findOpts, query.SortOrder, query.Skip, query.Limit)
 
 	// Execute the query
 	cursor, err := s.shipRecords.Find(ctx, mongoQuery, findOpts)
@@ -155,91 +135,12 @@ func (s *Storage) FindRecord(ctx context.Context, query types.SHIPQuery) ([]type
 		_ = cursor.Close(ctx)
 	}()
 
-	// Collect results
-	var results []types.UTXOReference
-	for cursor.Next(ctx) {
-		var record struct {
-			Txid        string `bson:"txid"`
-			OutputIndex int    `bson:"outputIndex"`
-		}
-
-		if err := cursor.Decode(&record); err != nil {
-			return nil, fmt.Errorf("failed to decode SHIP record: %w", err)
-		}
-
-		results = append(results, types.UTXOReference{
-			Txid:        record.Txid,
-			OutputIndex: record.OutputIndex,
-		})
-	}
-
-	if err := cursor.Err(); err != nil {
-		return nil, fmt.Errorf("cursor error while finding SHIP records: %w", err)
-	}
-
-	return results, nil
+	return shared.CollectUTXORefs(ctx, cursor, "SHIP")
 }
 
 // FindAll returns all SHIP records in the database with optional pagination and sorting.
 // This method ignores all filtering criteria and returns all available records.
 // Returns only UTXO references (txid and outputIndex) as projection for efficient querying.
 func (s *Storage) FindAll(ctx context.Context, limit, skip *int, sortOrder *types.SortOrder) ([]types.UTXOReference, error) {
-	// Set up the find options
-	findOpts := options.Find()
-
-	// Set projection to return only txid, outputIndex, and createdAt
-	findOpts.SetProjection(bson.M{
-		"txid":        1,
-		"outputIndex": 1,
-		"createdAt":   1,
-	})
-
-	// Set sort order (default to descending by createdAt)
-	mongoSortOrder := -1 // descending
-	if sortOrder != nil && *sortOrder == types.SortOrderAsc {
-		mongoSortOrder = 1 // ascending
-	}
-	findOpts.SetSort(bson.M{"createdAt": mongoSortOrder})
-
-	// Apply pagination
-	if skip != nil && *skip > 0 {
-		findOpts.SetSkip(int64(*skip))
-	}
-
-	if limit != nil && *limit > 0 {
-		findOpts.SetLimit(int64(*limit))
-	}
-
-	// Execute the query (empty filter to get all records)
-	cursor, err := s.shipRecords.Find(ctx, bson.M{}, findOpts)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find all SHIP records: %w", err)
-	}
-	defer func() {
-		_ = cursor.Close(ctx)
-	}()
-
-	// Collect results
-	var results []types.UTXOReference
-	for cursor.Next(ctx) {
-		var record struct {
-			Txid        string `bson:"txid"`
-			OutputIndex int    `bson:"outputIndex"`
-		}
-
-		if err := cursor.Decode(&record); err != nil {
-			return nil, fmt.Errorf("failed to decode SHIP record: %w", err)
-		}
-
-		results = append(results, types.UTXOReference{
-			Txid:        record.Txid,
-			OutputIndex: record.OutputIndex,
-		})
-	}
-
-	if err := cursor.Err(); err != nil {
-		return nil, fmt.Errorf("cursor error while finding all SHIP records: %w", err)
-	}
-
-	return results, nil
+	return shared.FindAllRecords(ctx, s.shipRecords, limit, skip, sortOrder, "SHIP")
 }

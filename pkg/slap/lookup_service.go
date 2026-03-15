@@ -17,6 +17,7 @@ import (
 	"github.com/bsv-blockchain/go-sdk/transaction"
 	"github.com/bsv-blockchain/go-sdk/transaction/template/pushdrop"
 
+	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/shared"
 	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
 )
 
@@ -40,9 +41,9 @@ var (
 	errQueryDomainInvalid        = errors.New("query.domain must be a string if provided")
 	errQueryTopicsInvalid        = errors.New("query.topics must be an array of strings if provided")
 	errQueryIdentityKeyInvalid   = errors.New("query.identityKey must be a string if provided")
-	errQueryLimitInvalid         = errors.New("query.limit must be a positive number if provided")
-	errQuerySkipInvalid          = errors.New("query.skip must be a non-negative number if provided")
-	errQuerySortOrderInvalid     = errors.New("query.sortOrder must be 'asc' or 'desc' if provided")
+	errQueryLimitInvalid         = shared.ErrQueryLimitInvalid
+	errQuerySkipInvalid          = shared.ErrQuerySkipInvalid
+	errQuerySortOrderInvalid     = shared.ErrQuerySortOrderInvalid
 )
 
 // LookupService implements the BSV overlay LookupService interface for SLAP protocol.
@@ -249,26 +250,7 @@ func (s *LookupService) validateQuery(query *types.SLAPQuery) error {
 	}
 
 	// Validate pagination parameters
-	if query.Limit != nil {
-		if *query.Limit < 0 {
-			return errQueryLimitInvalid
-		}
-	}
-
-	if query.Skip != nil {
-		if *query.Skip < 0 {
-			return errQuerySkipInvalid
-		}
-	}
-
-	// Validate sort order parameter
-	if query.SortOrder != nil {
-		if *query.SortOrder != types.SortOrderAsc && *query.SortOrder != types.SortOrderDesc {
-			return errQuerySortOrderInvalid
-		}
-	}
-
-	return nil
+	return shared.ValidatePagination(query.Limit, query.Skip, query.SortOrder)
 }
 
 // GetDocumentation returns the service documentation.
@@ -290,9 +272,5 @@ func (s *LookupService) GetMetaData() *overlay.MetaData {
 
 // convertUTXOsToLookupAnswer converts a slice of UTXO references to a LookupAnswer
 func (s *LookupService) convertUTXOsToLookupAnswer(utxos []types.UTXOReference) *lookup.LookupAnswer {
-	// For discovery services, we return the UTXOs as freeform result
-	return &lookup.LookupAnswer{
-		Type:   lookup.AnswerTypeFreeform,
-		Result: utxos,
-	}
+	return shared.ConvertUTXOsToLookupAnswer(utxos)
 }
