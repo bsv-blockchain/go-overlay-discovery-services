@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/shared"
 	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
 )
 
@@ -143,29 +144,8 @@ func FuzzQueryObjectRoundTrip(f *testing.F) {
 	f.Add(`{"limit": 10, "skip": 5, "sortOrder": "asc"}`)
 
 	f.Fuzz(func(t *testing.T, jsonStr string) {
-		if len(jsonStr) > 10000 {
-			t.Skip("input too large")
-		}
-		// Try to unmarshal into interface
-		var queryInterface interface{}
-		err := json.Unmarshal([]byte(jsonStr), &queryInterface)
-		if err != nil {
-			return
-		}
-
-		// Try to marshal back to JSON
-		jsonBytes, err := json.Marshal(queryInterface)
-		if err != nil {
-			t.Errorf("Failed to marshal query interface: %v", err)
-			return
-		}
-
-		// Try to unmarshal into SHIPQuery
 		var shipQuery types.SHIPQuery
-		err = json.Unmarshal(jsonBytes, &shipQuery)
-
-		// Function should not panic, errors are acceptable
-		_ = err
+		shared.FuzzQueryObjectRoundTripHelper(t, jsonStr, &shipQuery)
 	})
 }
 
@@ -192,23 +172,11 @@ func FuzzDomainString(f *testing.F) {
 	}
 	f.Add(longDomain)
 
+	service := &LookupService{storage: nil}
 	f.Fuzz(func(t *testing.T, domain string) {
-		if len(domain) > 10000 {
-			t.Skip("input too large")
-		}
-		// Create a query with the fuzzed domain
-		domainPtr := &domain
-		query := &types.SHIPQuery{
-			Domain: domainPtr,
-		}
-
-		service := &LookupService{storage: nil}
-
-		// Function should not panic on any input
-		err := service.validateQuery(query)
-
-		// We don't validate the error, just ensure no panic occurs
-		_ = err
+		shared.FuzzDomainValidationHelper(t, domain, func(d *string) error {
+			return service.validateQuery(&types.SHIPQuery{Domain: d})
+		})
 	})
 }
 
@@ -260,23 +228,11 @@ func FuzzIdentityKeyString(f *testing.F) {
 	f.Add("0x1234")
 	f.Add(string(make([]byte, 1000)))
 
+	service := &LookupService{storage: nil}
 	f.Fuzz(func(t *testing.T, identityKey string) {
-		if len(identityKey) > 10000 {
-			t.Skip("input too large")
-		}
-		// Create a query with the fuzzed identity key
-		identityKeyPtr := &identityKey
-		query := &types.SHIPQuery{
-			IdentityKey: identityKeyPtr,
-		}
-
-		service := &LookupService{storage: nil}
-
-		// Function should not panic on any input
-		err := service.validateQuery(query)
-
-		// We don't validate the error, just ensure no panic occurs
-		_ = err
+		shared.FuzzIdentityKeyValidationHelper(t, identityKey, func(ik *string) error {
+			return service.validateQuery(&types.SHIPQuery{IdentityKey: ik})
+		})
 	})
 }
 
@@ -292,21 +248,10 @@ func FuzzPaginationParameters(f *testing.F) {
 	f.Add(-100, -100)
 	f.Add(2147483647, 2147483647) // Max int32
 
+	service := &LookupService{storage: nil}
 	f.Fuzz(func(t *testing.T, limit, skip int) {
-		// Create a query with the fuzzed pagination parameters
-		limitPtr := &limit
-		skipPtr := &skip
-		query := &types.SHIPQuery{
-			Limit: limitPtr,
-			Skip:  skipPtr,
-		}
-
-		service := &LookupService{storage: nil}
-
-		// Function should not panic on any input
-		err := service.validateQuery(query)
-
-		// We expect errors for negative values, but no panics
-		_ = err
+		shared.FuzzPaginationValidationHelper(t, limit, skip, func(l, s *int) error {
+			return service.validateQuery(&types.SHIPQuery{Limit: l, Skip: s})
+		})
 	})
 }
