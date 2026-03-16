@@ -5,13 +5,16 @@ import (
 	"testing"
 )
 
+// skipInputTooLarge is the skip message used when fuzz input exceeds the size threshold.
+const skipInputTooLarge = "input too large"
+
 // FuzzQueryObjectRoundTripHelper implements the common FuzzQueryObjectRoundTrip logic.
 // It unmarshals JSON into an interface, marshals it back, then unmarshals into the target type.
 // The target parameter should be a pointer to the query type (e.g. *SHIPQuery or *SLAPQuery).
 func FuzzQueryObjectRoundTripHelper(t *testing.T, jsonStr string, target interface{}) {
 	t.Helper()
 	if len(jsonStr) > 10000 {
-		t.Skip("input too large")
+		t.Skip(skipInputTooLarge)
 	}
 	// Try to unmarshal into interface
 	var queryInterface interface{}
@@ -39,7 +42,7 @@ func FuzzQueryObjectRoundTripHelper(t *testing.T, jsonStr string, target interfa
 func FuzzDomainValidationHelper(t *testing.T, domain string, validateFn func(*string) error) {
 	t.Helper()
 	if len(domain) > 10000 {
-		t.Skip("input too large")
+		t.Skip(skipInputTooLarge)
 	}
 	// Function should not panic on any input
 	err := validateFn(&domain)
@@ -51,7 +54,7 @@ func FuzzDomainValidationHelper(t *testing.T, domain string, validateFn func(*st
 func FuzzIdentityKeyValidationHelper(t *testing.T, identityKey string, validateFn func(*string) error) {
 	t.Helper()
 	if len(identityKey) > 10000 {
-		t.Skip("input too large")
+		t.Skip(skipInputTooLarge)
 	}
 	// Function should not panic on any input
 	err := validateFn(&identityKey)

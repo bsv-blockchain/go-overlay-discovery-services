@@ -4,10 +4,7 @@ package ship
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
-	"fmt"
-	"reflect"
 
 	"github.com/bsv-blockchain/go-overlay-services/pkg/core/engine"
 	"github.com/bsv-blockchain/go-sdk/chainhash"
@@ -31,10 +28,8 @@ const (
 
 // Static error variables for err113 compliance
 var (
-	errQueryDomainInvalid       = errors.New("query.domain must be a string if provided")
-	errQueryTopicsInvalid       = errors.New("query.topics must be an array of strings if provided")
-	errQueryTopicElementInvalid = errors.New("query.topics element must be a string")
-	errQueryIdentityKeyInvalid  = errors.New("query.identityKey must be a string if provided")
+	errQueryDomainInvalid      = errors.New("query.domain must be a string if provided")
+	errQueryIdentityKeyInvalid = errors.New("query.identityKey must be a string if provided")
 )
 
 // LookupService implements the BSV overlay LookupService interface for SHIP protocol.
@@ -79,22 +74,13 @@ func (s *LookupService) OutputAdmittedByTopic(ctx context.Context, payload *engi
 // OutputSpent handles an output being spent.
 // This method removes the corresponding SHIP record when the UTXO is spent.
 func (s *LookupService) OutputSpent(ctx context.Context, payload *engine.OutputSpent) error {
-	// Only process SHIP topic
-	if payload.Topic != Topic {
-		return nil // Silently ignore non-SHIP topics
-	}
-
-	// Delete the SHIP record
-	txid := hex.EncodeToString(payload.Outpoint.Txid[:])
-	return s.storage.DeleteSHIPRecord(ctx, txid, int(payload.Outpoint.Index))
+	return shared.HandleOutputSpent(ctx, payload, Topic, s.storage.DeleteSHIPRecord)
 }
 
 // OutputEvicted handles an output being evicted.
 // This method removes the corresponding SHIP record when the UTXO is evicted from the mempool.
 func (s *LookupService) OutputEvicted(ctx context.Context, outpoint *transaction.Outpoint) error {
-	// Delete the SHIP record
-	txid := hex.EncodeToString(outpoint.Txid[:])
-	return s.storage.DeleteSHIPRecord(ctx, txid, int(outpoint.Index))
+	return shared.HandleOutputEvicted(ctx, outpoint, s.storage.DeleteSHIPRecord)
 }
 
 // OutputNoLongerRetainedInHistory handles outputs no longer retained in history.
@@ -165,32 +151,11 @@ func (s *LookupService) parseQueryObject(query interface{}) (*types.SHIPQuery, e
 
 // validateQuery validates the query parameters
 func (s *LookupService) validateQuery(query *types.SHIPQuery) error {
-	// Validate domain parameter
-	if query.Domain != nil {
-		if reflect.TypeOf(query.Domain).Kind() != reflect.Ptr ||
-			reflect.TypeOf(query.Domain).Elem().Kind() != reflect.String {
-			return errQueryDomainInvalid
-		}
+	if err := shared.ValidateStringPtrField(query.Domain, errQueryDomainInvalid); err != nil {
+		return err
 	}
-
-	// Validate topics parameter
-	if query.Topics != nil {
-		if reflect.TypeOf(query.Topics).Kind() != reflect.Slice {
-			return errQueryTopicsInvalid
-		}
-		for i, topic := range query.Topics {
-			if reflect.TypeOf(topic).Kind() != reflect.String {
-				return fmt.Errorf("%w: at index %d", errQueryTopicElementInvalid, i)
-			}
-		}
-	}
-
-	// Validate identityKey parameter
-	if query.IdentityKey != nil {
-		if reflect.TypeOf(query.IdentityKey).Kind() != reflect.Ptr ||
-			reflect.TypeOf(query.IdentityKey).Elem().Kind() != reflect.String {
-			return errQueryIdentityKeyInvalid
-		}
+	if err := shared.ValidateStringPtrField(query.IdentityKey, errQueryIdentityKeyInvalid); err != nil {
+		return err
 	}
 
 	// Validate pagination parameters

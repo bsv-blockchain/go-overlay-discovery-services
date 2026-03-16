@@ -34,7 +34,7 @@ func IdentifyAdmissibleOutputs(ctx context.Context, beef []byte, previousCoins m
 	// Parse transaction from BEEF format
 	parsedTransaction, err := transaction.NewTransactionFromBEEF(beef)
 	if err != nil {
-		if len(outputsToAdmit) == 0 && len(previousCoins) == 0 {
+		if len(previousCoins) == 0 {
 			log.Printf("%s Error identifying admissible outputs: %v", cfg.EmojiNone, err)
 		}
 		return overlay.AdmittanceInstructions{
@@ -45,76 +45,79 @@ func IdentifyAdmissibleOutputs(ctx context.Context, beef []byte, previousCoins m
 
 	// Check each output for token validity
 	for i, output := range parsedTransaction.Outputs {
-		result := pushdrop.Decode(output.LockingScript)
-		if result == nil {
-			continue
-		}
-
-		// Tokens must have exactly 5 fields
-		if len(result.Fields) != 5 {
-			continue
-		}
-
-		// Check protocol identifier (first field)
-		identifier := utils.UTFBytesToString(result.Fields[0])
-		if identifier != cfg.Identifier {
-			continue
-		}
-
-		// Check advertised URI (third field)
-		advertisedURI := utils.UTFBytesToString(result.Fields[2])
-		if !utils.IsAdvertisableURI(advertisedURI) {
-			continue
-		}
-
-		// Check topic/service name (fourth field)
-		topic := utils.UTFBytesToString(result.Fields[3])
-		if !utils.IsValidTopicOrServiceName(topic) {
-			continue
-		}
-
-		// Check required prefix
-		if !strings.HasPrefix(topic, cfg.TopicPrefix) {
-			continue
-		}
-
-		// Check token signature linkage
-		lockingPublicKey := result.LockingPublicKey.ToDERHex()
-		tokenFields := make(utils.TokenFields, len(result.Fields))
-		copy(tokenFields, result.Fields)
-
-		if valid, sigErr := utils.IsTokenSignatureCorrectlyLinked(ctx, lockingPublicKey, tokenFields); sigErr == nil && valid {
-			if i >= 0 && i <= 0xFFFFFFFF {
-				outputsToAdmit = append(outputsToAdmit, uint32(i))
-			}
-		} else if sigErr == nil && !valid {
-			slog.Info("Invalid token signature linkage", "outputIndex", i, "txid", parsedTransaction.TxID())
+		if idx, ok := validateOutput(ctx, i, output, parsedTransaction, cfg); ok {
+			outputsToAdmit = append(outputsToAdmit, idx)
 		}
 	}
 
-	// Logging
-	if len(outputsToAdmit) > 0 {
-		if len(outputsToAdmit) == 1 {
-			log.Printf("%s Admitted %d %s output!", cfg.EmojiAdmit, len(outputsToAdmit), cfg.Identifier)
-		} else {
-			log.Printf("%s Admitted %d %s outputs!", cfg.EmojiAdmit, len(outputsToAdmit), cfg.Identifier)
-		}
-	}
-
-	if len(previousCoins) > 0 {
-		if len(previousCoins) == 1 {
-			log.Printf("%s Consumed %d previous %s coin!", cfg.EmojiConsume, len(previousCoins), cfg.Identifier)
-		} else {
-			log.Printf("%s Consumed %d previous %s coins!", cfg.EmojiConsume, len(previousCoins), cfg.Identifier)
-		}
-	}
-
-	if len(outputsToAdmit) == 0 && len(previousCoins) == 0 {
-		log.Printf("%s No %s outputs admitted and no previous %s coins consumed.", cfg.EmojiNone, cfg.Identifier, cfg.Identifier)
-	}
+	logAdmittanceResults(outputsToAdmit, previousCoins, cfg)
 
 	return overlay.AdmittanceInstructions{
 		OutputsToAdmit: outputsToAdmit,
 		CoinsToRetain:  []uint32{},
 	}, nil
+}
+
+// validateOutput checks whether a single transaction output contains a valid PushDrop token
+// matching the protocol configuration. Returns the output index and true if valid.
+func validateOutput(ctx context.Context, i int, output *transaction.TransactionOutput, parsedTransaction *transaction.Transaction, cfg AdmittanceConfig) (uint32, bool) {
+	result := pushdrop.Decode(output.LockingScript)
+	if result == nil || len(result.Fields) != 5 {
+		return 0, false
+	}
+
+	if utils.UTFBytesToString(result.Fields[0]) != cfg.Identifier {
+		return 0, false
+	}
+
+	if !utils.IsAdvertisableURI(utils.UTFBytesToString(result.Fields[2])) {
+		return 0, false
+	}
+
+	topic := utils.UTFBytesToString(result.Fields[3])
+	if !utils.IsValidTopicOrServiceName(topic) || !strings.HasPrefix(topic, cfg.TopicPrefix) {
+		return 0, false
+	}
+
+	lockingPublicKey := result.LockingPublicKey.ToDERHex()
+	tokenFields := make(utils.TokenFields, len(result.Fields))
+	copy(tokenFields, result.Fields)
+
+	valid, sigErr := utils.IsTokenSignatureCorrectlyLinked(ctx, lockingPublicKey, tokenFields)
+	if sigErr != nil || !valid {
+		if sigErr == nil {
+			slog.Info("Invalid token signature linkage", "outputIndex", i, "txid", parsedTransaction.TxID())
+		}
+		return 0, false
+	}
+
+	if i < 0 || i > 0xFFFFFFFF {
+		return 0, false
+	}
+	return uint32(i), true
+}
+
+// logAdmittanceResults logs the outcome of the admittance check.
+func logAdmittanceResults(outputsToAdmit []uint32, previousCoins map[uint32]*transaction.TransactionOutput, cfg AdmittanceConfig) {
+	if len(outputsToAdmit) > 0 {
+		suffix := pluralSuffix(len(outputsToAdmit))
+		log.Printf("%s Admitted %d %s output%s!", cfg.EmojiAdmit, len(outputsToAdmit), cfg.Identifier, suffix)
+	}
+
+	if len(previousCoins) > 0 {
+		suffix := pluralSuffix(len(previousCoins))
+		log.Printf("%s Consumed %d previous %s coin%s!", cfg.EmojiConsume, len(previousCoins), cfg.Identifier, suffix)
+	}
+
+	if len(outputsToAdmit) == 0 && len(previousCoins) == 0 {
+		log.Printf("%s No %s outputs admitted and no previous %s coins consumed.", cfg.EmojiNone, cfg.Identifier, cfg.Identifier)
+	}
+}
+
+// pluralSuffix returns "s" when count != 1, empty string otherwise.
+func pluralSuffix(count int) string {
+	if count == 1 {
+		return ""
+	}
+	return "s"
 }

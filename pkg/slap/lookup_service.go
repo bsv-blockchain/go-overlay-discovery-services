@@ -4,9 +4,7 @@ package slap
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
-	"reflect"
 
 	"github.com/bsv-blockchain/go-overlay-services/pkg/core/engine"
 	"github.com/bsv-blockchain/go-sdk/chainhash"
@@ -77,22 +75,13 @@ func (s *LookupService) OutputAdmittedByTopic(ctx context.Context, payload *engi
 // OutputSpent handles an output being spent.
 // This method removes the corresponding SLAP record when the UTXO is spent.
 func (s *LookupService) OutputSpent(ctx context.Context, payload *engine.OutputSpent) error {
-	// Only process SLAP topic
-	if payload.Topic != Topic {
-		return nil // Silently ignore non-SLAP topics
-	}
-
-	// Delete the SLAP record
-	txid := hex.EncodeToString(payload.Outpoint.Txid[:])
-	return s.storage.DeleteSLAPRecord(ctx, txid, int(payload.Outpoint.Index))
+	return shared.HandleOutputSpent(ctx, payload, Topic, s.storage.DeleteSLAPRecord)
 }
 
 // OutputEvicted handles an output being evicted.
 // This method removes the corresponding SLAP record when the UTXO is evicted from the mempool.
 func (s *LookupService) OutputEvicted(ctx context.Context, outpoint *transaction.Outpoint) error {
-	// Delete the SLAP record
-	txid := hex.EncodeToString(outpoint.Txid[:])
-	return s.storage.DeleteSLAPRecord(ctx, txid, int(outpoint.Index))
+	return shared.HandleOutputEvicted(ctx, outpoint, s.storage.DeleteSLAPRecord)
 }
 
 // OutputNoLongerRetainedInHistory handles outputs no longer retained in history.
@@ -163,28 +152,14 @@ func (s *LookupService) parseQueryObject(query interface{}) (*types.SLAPQuery, e
 
 // validateQuery validates the query parameters
 func (s *LookupService) validateQuery(query *types.SLAPQuery) error {
-	// Validate domain parameter
-	if query.Domain != nil {
-		if reflect.TypeOf(query.Domain).Kind() != reflect.Ptr ||
-			reflect.TypeOf(query.Domain).Elem().Kind() != reflect.String {
-			return errQueryDomainInvalid
-		}
+	if err := shared.ValidateStringPtrField(query.Domain, errQueryDomainInvalid); err != nil {
+		return err
 	}
-
-	// Validate service parameter
-	if query.Service != nil {
-		if reflect.TypeOf(query.Service).Kind() != reflect.Ptr ||
-			reflect.TypeOf(query.Service).Elem().Kind() != reflect.String {
-			return errQueryTopicsInvalid
-		}
+	if err := shared.ValidateStringPtrField(query.Service, errQueryTopicsInvalid); err != nil {
+		return err
 	}
-
-	// Validate identityKey parameter
-	if query.IdentityKey != nil {
-		if reflect.TypeOf(query.IdentityKey).Kind() != reflect.Ptr ||
-			reflect.TypeOf(query.IdentityKey).Elem().Kind() != reflect.String {
-			return errQueryIdentityKeyInvalid
-		}
+	if err := shared.ValidateStringPtrField(query.IdentityKey, errQueryIdentityKeyInvalid); err != nil {
+		return err
 	}
 
 	// Validate pagination parameters
