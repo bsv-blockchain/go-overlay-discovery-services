@@ -120,7 +120,7 @@ func (s *Storage) FindRecord(ctx context.Context, query types.SLAPQuery) ([]type
 
 	// Set up the find options
 	findOpts := options.Find()
-	findOpts.SetProjection(shared.UTXOProjection)
+	findOpts.SetProjection(shared.UTXOProjection())
 	shared.ApplyPaginationOpts(findOpts, query.SortOrder, query.Skip, query.Limit)
 
 	// Execute the query

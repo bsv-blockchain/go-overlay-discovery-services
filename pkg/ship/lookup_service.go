@@ -169,7 +169,6 @@ func (s *LookupService) GetDocumentation() string {
 	return LookupDocumentation
 }
 
-
 // GetMetaData returns the service metadata.
 // This method provides basic information about the SHIP lookup service
 // including name and description.

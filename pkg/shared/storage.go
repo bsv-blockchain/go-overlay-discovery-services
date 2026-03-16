@@ -12,11 +12,13 @@ import (
 	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
 )
 
-// UTXOProjection is the standard projection for returning UTXO references.
-var UTXOProjection = bson.M{
-	"txid":        1,
-	"outputIndex": 1,
-	"createdAt":   1,
+// UTXOProjection returns the standard projection for returning UTXO references.
+func UTXOProjection() bson.M {
+	return bson.M{
+		"txid":        1,
+		"outputIndex": 1,
+		"createdAt":   1,
+	}
 }
 
 // ApplyPaginationOpts configures sort, skip, and limit on find options.
@@ -67,7 +69,7 @@ func CollectUTXORefs(ctx context.Context, cursor *mongo.Cursor, recordType strin
 // FindAllRecords executes a find-all query with pagination on the given collection.
 func FindAllRecords(ctx context.Context, collection *mongo.Collection, limit, skip *int, sortOrder *types.SortOrder, recordType string) ([]types.UTXOReference, error) {
 	findOpts := options.Find()
-	findOpts.SetProjection(UTXOProjection)
+	findOpts.SetProjection(UTXOProjection())
 	ApplyPaginationOpts(findOpts, sortOrder, skip, limit)
 
 	cursor, err := collection.Find(ctx, bson.M{}, findOpts)

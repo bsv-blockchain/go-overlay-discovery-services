@@ -182,4 +182,3 @@ func (s *LookupService) GetMetaData() *overlay.MetaData {
 		Description: "Provides lookup capabilities for SLAP tokens.",
 	}
 }
-

@@ -17,11 +17,11 @@ var (
 
 // PushDropFields holds the parsed fields from a PushDrop locking script.
 type PushDropFields struct {
-	IdentityKey    string
-	Domain         string
-	FourthField    string // topic (SHIP) or service (SLAP)
-	Txid           string
-	OutputIndex    int
+	IdentityKey string
+	Domain      string
+	FourthField string // topic (SHIP) or service (SLAP)
+	Txid        string
+	OutputIndex int
 }
 
 // ParsePushDropOutput decodes a PushDrop locking script from an OutputAdmittedByTopic payload,
