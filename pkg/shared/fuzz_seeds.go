@@ -92,9 +92,8 @@ func FuzzParseQueryBody(t *testing.T, jsonStr string, parseFn func(interface{}) 
 		t.Skip(skipInputTooLarge)
 	}
 	var queryInterface interface{}
-	if err := json.Unmarshal([]byte(jsonStr), &queryInterface); err != nil {
-		return
+	if json.Unmarshal([]byte(jsonStr), &queryInterface) == nil {
+		// Function should not panic on any input
+		_ = parseFn(queryInterface)
 	}
-	// Function should not panic on any input
-	_ = parseFn(queryInterface)
 }
