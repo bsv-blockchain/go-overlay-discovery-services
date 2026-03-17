@@ -7,7 +7,6 @@ import (
 	"errors"
 
 	"github.com/bsv-blockchain/go-overlay-services/pkg/core/engine"
-	"github.com/bsv-blockchain/go-sdk/chainhash"
 	"github.com/bsv-blockchain/go-sdk/overlay"
 	"github.com/bsv-blockchain/go-sdk/overlay/lookup"
 	"github.com/bsv-blockchain/go-sdk/transaction"
@@ -36,6 +35,9 @@ var (
 // It provides lookup capabilities for SHIP tokens within the overlay network,
 // allowing discovery of nodes that host specific topics.
 type LookupService struct {
+	// DiscoveryNoOps provides no-op implementations for methods not relevant to discovery services
+	shared.DiscoveryNoOps
+
 	// storage is the SHIP storage implementation
 	storage StorageInterface
 }
@@ -81,22 +83,6 @@ func (s *LookupService) OutputSpent(ctx context.Context, payload *engine.OutputS
 // This method removes the corresponding SHIP record when the UTXO is evicted from the mempool.
 func (s *LookupService) OutputEvicted(ctx context.Context, outpoint *transaction.Outpoint) error {
 	return shared.HandleOutputEvicted(ctx, outpoint, s.storage.DeleteSHIPRecord)
-}
-
-// OutputNoLongerRetainedInHistory handles outputs no longer retained in history.
-// Called when a Topic Manager decides that historical retention of the specified UTXO is no longer required.
-// For SHIP discovery services, this is typically a no-op as they don't maintain historical retention.
-func (s *LookupService) OutputNoLongerRetainedInHistory(_ context.Context, _ *transaction.Outpoint, _ string) error {
-	// Discovery services don't have the concept of historical retention, so we ignore it
-	return nil
-}
-
-// OutputBlockHeightUpdated handles block height updates for transactions.
-// Called when the block height of a transaction is updated (e.g., when a transaction is included in a block).
-// For SHIP discovery services, this is typically a no-op as they don't track block heights.
-func (s *LookupService) OutputBlockHeightUpdated(_ context.Context, _ *chainhash.Hash, _ uint32, _ uint64) error {
-	// Discovery services don't handle block height updates, so we ignore it
-	return nil
 }
 
 // Lookup performs a lookup query and returns matching results.

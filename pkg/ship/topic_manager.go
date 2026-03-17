@@ -309,8 +309,7 @@ func (tm *TopicManager) IdentifyAdmissibleOutputs(ctx context.Context, beef []by
 // IdentifyNeededInputs implements the engine.TopicManager interface
 // For SHIP, this identifies inputs needed for validation
 func (tm *TopicManager) IdentifyNeededInputs(_ context.Context, _ []byte) ([]*transaction.Outpoint, error) {
-	// SHIP doesn't require specific inputs for validation
-	return []*transaction.Outpoint{}, nil
+	return shared.IdentifyNeededInputsNoOp()
 }
 
 // GetDocumentation implements the engine.TopicManager interface

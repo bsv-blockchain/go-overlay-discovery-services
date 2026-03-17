@@ -3,6 +3,8 @@ package shared
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
 )
 
 // skipInputTooLarge is the skip message used when fuzz input exceeds the size threshold.
@@ -69,3 +71,15 @@ func FuzzPaginationValidationHelper(t *testing.T, limit, skip int, validateFn fu
 	err := validateFn(&limit, &skip)
 	_ = err
 }
+
+// StrPtr returns a pointer to the given string. Shared helper for fuzz tests.
+func StrPtr(s string) *string { return &s }
+
+// IntPtr returns a pointer to the given int. Shared helper for fuzz tests.
+func IntPtr(i int) *int { return &i }
+
+// BoolPtr returns a pointer to the given bool. Shared helper for fuzz tests.
+func BoolPtr(b bool) *bool { return &b }
+
+// SortOrderPtr returns a pointer to the given SortOrder. Shared helper for fuzz tests.
+func SortOrderPtr(s types.SortOrder) *types.SortOrder { return &s }

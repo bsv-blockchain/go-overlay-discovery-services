@@ -28,11 +28,6 @@ func FuzzParseQueryObjectJSON(f *testing.F) {
 
 // FuzzValidateQuerySLAP tests the validateQuery method with random query parameters.
 func FuzzValidateQuerySLAP(f *testing.F) {
-	strPtr := func(s string) *string { return &s }
-	intPtr := func(i int) *int { return &i }
-	boolPtr := func(b bool) *bool { return &b }
-	sortOrderPtr := func(s types.SortOrder) *types.SortOrder { return &s }
-
 	f.Add(true, "example.com", "ls_payments", "key123", 10, 0, "asc")
 	f.Add(false, "", "", "", 0, 0, "desc")
 	f.Add(false, "test.com", "ls_identity", "", 100, 50, "asc")
@@ -48,26 +43,25 @@ func FuzzValidateQuerySLAP(f *testing.F) {
 		}
 		query := &types.SLAPQuery{}
 		if findAll {
-			query.FindAll = boolPtr(findAll)
+			query.FindAll = shared.BoolPtr(findAll)
 		}
 		if domain != "" {
-			query.Domain = strPtr(domain)
+			query.Domain = shared.StrPtr(domain)
 		}
 		if serviceName != "" {
-			query.Service = strPtr(serviceName)
+			query.Service = shared.StrPtr(serviceName)
 		}
 		if identityKey != "" {
-			query.IdentityKey = strPtr(identityKey)
+			query.IdentityKey = shared.StrPtr(identityKey)
 		}
 		if limit != 0 {
-			query.Limit = intPtr(limit)
+			query.Limit = shared.IntPtr(limit)
 		}
 		if skip != 0 {
-			query.Skip = intPtr(skip)
+			query.Skip = shared.IntPtr(skip)
 		}
 		if sortOrder != "" {
-			so := types.SortOrder(sortOrder)
-			query.SortOrder = sortOrderPtr(so)
+			query.SortOrder = shared.SortOrderPtr(types.SortOrder(sortOrder))
 		}
 		_ = service.validateQuery(query)
 	})
