@@ -34,7 +34,7 @@ func FuzzIsAdvertisableURI(f *testing.F) {
 	f.Add("wss://")
 	f.Add("js8c+bsvauth+smf:?")
 	f.Add("https://[::1]/")
-	f.Add("https://192.168.1.1/")
+	f.Add("https://198.51.100.1/")
 
 	f.Fuzz(func(t *testing.T, uri string) {
 		if len(uri) > 10000 {
@@ -129,7 +129,7 @@ func FuzzValidateCustomHTTPSURI(f *testing.F) {
 	// Seed corpus with edge cases
 	f.Add("custom://", "custom://")
 	f.Add("://example.com/", "://")
-	f.Add("custom://192.168.1.1/", "custom://")
+	f.Add("custom://198.51.100.1/", "custom://")
 	f.Add("custom://[::1]/", "custom://")
 
 	f.Fuzz(func(t *testing.T, uri, prefix string) {
@@ -158,7 +158,7 @@ func FuzzValidateWSSURI(f *testing.F) {
 
 	// Seed corpus with edge cases
 	f.Add("wss://")
-	f.Add("wss://192.168.1.1")
+	f.Add("wss://198.51.100.1")
 	f.Add("wss://[::1]")
 	f.Add("wss://example.com:99999")
 

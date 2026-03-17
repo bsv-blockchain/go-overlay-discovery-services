@@ -6,17 +6,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
-	"log/slog"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/bsv-blockchain/go-sdk/overlay"
-	"github.com/bsv-blockchain/go-sdk/transaction"
-	"github.com/bsv-blockchain/go-sdk/transaction/template/pushdrop"
 
-	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/utils"
+	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/shared"
 )
 
 // Static error variables for err113 compliance
@@ -59,6 +54,9 @@ type TopicMessageHandler func(ctx context.Context, message TopicMessage) error
 // It provides capabilities for subscribing to overlay network topics, handling messages,
 // and managing topic lifecycle within the SHIP ecosystem.
 type TopicManager struct {
+	// BaseTopicManagerOps provides shared implementations for engine.TopicManager interface methods
+	shared.BaseTopicManagerOps
+
 	// subscriptions holds all active topic subscriptions
 	subscriptions map[string]*TopicSubscription
 	// handlers holds message handlers for each subscribed topic
@@ -75,7 +73,20 @@ type TopicManager struct {
 // This constructor initializes the topic manager with the required dependencies
 // for managing overlay network topic subscriptions and message routing.
 func NewTopicManager(storage StorageInterface, lookupService *LookupService) *TopicManager {
+	doc := TopicManagerDocumentation
 	return &TopicManager{
+		BaseTopicManagerOps: shared.NewBaseTopicManagerOps(shared.BaseTopicManagerConfig{
+			Admittance: shared.AdmittanceConfig{
+				Identifier:   "SHIP",
+				TopicPrefix:  "tm_",
+				EmojiAdmit:   "\U0001f6f3\ufe0f",
+				EmojiConsume: "\U0001f6a2",
+				EmojiNone:    "\u2693",
+			},
+			MetaDataName:        "SHIP Topic Manager",
+			MetaDataDescription: "Manages SHIP protocol topics for service host interconnection and discovery",
+			Documentation:       &doc,
+		}),
 		subscriptions: make(map[string]*TopicSubscription),
 		handlers:      make(map[string]TopicMessageHandler),
 		storage:       storage,
@@ -298,119 +309,5 @@ func (tm *TopicManager) GetTotalMessageCount() int64 {
 	return total
 }
 
-// IdentifyAdmissibleOutputs implements the engine.TopicManager interface
-// For SHIP, this identifies outputs that should be admitted to the overlay
-func (tm *TopicManager) IdentifyAdmissibleOutputs(ctx context.Context, beef []byte, previousCoins map[uint32]*transaction.TransactionOutput) (overlay.AdmittanceInstructions, error) {
-	outputsToAdmit := []uint32{}
-
-	// Parse transaction from BEEF format
-	parsedTransaction, err := transaction.NewTransactionFromBEEF(beef)
-	if err != nil {
-		// Only log error if no outputs were admitted and no previous coins consumed
-		if len(outputsToAdmit) == 0 && len(previousCoins) == 0 {
-			log.Printf("⛴️ Error identifying admissible outputs: %v", err)
-		}
-		return overlay.AdmittanceInstructions{
-			OutputsToAdmit: outputsToAdmit,
-			CoinsToRetain:  []uint32{},
-		}, nil
-	}
-
-	// Check each output for SHIP token validity
-	for i, output := range parsedTransaction.Outputs {
-		// Decode PushDrop token
-		result := pushdrop.Decode(output.LockingScript)
-		if result == nil {
-			continue // It's common for other outputs to be invalid; no need to log an error here
-		}
-
-		// SHIP tokens must have exactly 5 fields
-		if len(result.Fields) != 5 {
-			continue
-		}
-
-		// Check SHIP identifier (first field)
-		shipIdentifier := utils.UTFBytesToString(result.Fields[0])
-		if shipIdentifier != "SHIP" {
-			continue
-		}
-
-		// Check advertised URI (third field)
-		advertisedURI := utils.UTFBytesToString(result.Fields[2])
-		if !utils.IsAdvertisableURI(advertisedURI) {
-			continue
-		}
-
-		// Check topic name (fourth field)
-		topic := utils.UTFBytesToString(result.Fields[3])
-		if !utils.IsValidTopicOrServiceName(topic) {
-			continue
-		}
-
-		// SHIP only accepts "tm_" (topic manager) advertisements
-		if !strings.HasPrefix(topic, "tm_") {
-			continue
-		}
-
-		// Check token signature linkage
-		lockingPublicKey := result.LockingPublicKey.ToDERHex()
-		tokenFields := make(utils.TokenFields, len(result.Fields))
-		copy(tokenFields, result.Fields)
-
-		if valid, err := utils.IsTokenSignatureCorrectlyLinked(ctx, lockingPublicKey, tokenFields); err == nil && valid {
-			if i >= 0 && i <= 0xFFFFFFFF {
-				outputsToAdmit = append(outputsToAdmit, uint32(i))
-			}
-		} else if err == nil && !valid {
-			slog.Info("Invalid token signature linkage", "outputIndex", i, "txid", parsedTransaction.TxID())
-		}
-	}
-
-	// Friendly logging with ship emojis
-	if len(outputsToAdmit) > 0 {
-		if len(outputsToAdmit) == 1 {
-			log.Printf("🛳️ Ahoy! Admitted %d SHIP output!", len(outputsToAdmit))
-		} else {
-			log.Printf("🛳️ Ahoy! Admitted %d SHIP outputs!", len(outputsToAdmit))
-		}
-	}
-
-	if len(previousCoins) > 0 {
-		if len(previousCoins) == 1 {
-			log.Printf("🚢 Consumed %d previous SHIP coin!", len(previousCoins))
-		} else {
-			log.Printf("🚢 Consumed %d previous SHIP coins!", len(previousCoins))
-		}
-	}
-
-	if len(outputsToAdmit) == 0 && len(previousCoins) == 0 {
-		log.Printf("⚓ No SHIP outputs admitted and no previous SHIP coins consumed.")
-	}
-
-	return overlay.AdmittanceInstructions{
-		OutputsToAdmit: outputsToAdmit,
-		CoinsToRetain:  []uint32{},
-	}, nil
-}
-
-// IdentifyNeededInputs implements the engine.TopicManager interface
-// For SHIP, this identifies inputs needed for validation
-func (tm *TopicManager) IdentifyNeededInputs(_ context.Context, _ []byte) ([]*transaction.Outpoint, error) {
-	// SHIP doesn't require specific inputs for validation
-	return []*transaction.Outpoint{}, nil
-}
-
-// GetDocumentation implements the engine.TopicManager interface
-// Returns documentation for the SHIP topic manager
-func (tm *TopicManager) GetDocumentation() string {
-	return TopicManagerDocumentation
-}
-
-// GetMetaData implements the engine.TopicManager interface
-// Returns metadata about the SHIP topic manager
-func (tm *TopicManager) GetMetaData() *overlay.MetaData {
-	return &overlay.MetaData{
-		Name:        "SHIP Topic Manager",
-		Description: "Manages SHIP protocol topics for service host interconnection and discovery",
-	}
-}
+// The IdentifyAdmissibleOutputs, IdentifyNeededInputs, GetDocumentation, and GetMetaData
+// methods are provided by the embedded shared.BaseTopicManagerOps struct.

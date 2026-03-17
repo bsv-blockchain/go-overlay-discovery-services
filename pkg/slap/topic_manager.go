@@ -6,17 +6,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
-	"log/slog"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/bsv-blockchain/go-sdk/overlay"
-	"github.com/bsv-blockchain/go-sdk/transaction"
-	"github.com/bsv-blockchain/go-sdk/transaction/template/pushdrop"
 
-	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/utils"
+	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/shared"
 )
 
 // Static error variables for err113 compliance
@@ -67,6 +62,9 @@ type ServiceMessageHandler func(ctx context.Context, message ServiceMessage) err
 // It provides capabilities for subscribing to overlay network services, handling messages,
 // and managing service lifecycle within the SLAP ecosystem.
 type TopicManager struct {
+	// BaseTopicManagerOps provides shared implementations for engine.TopicManager interface methods
+	shared.BaseTopicManagerOps
+
 	// subscriptions holds all active service subscriptions keyed by service+domain
 	subscriptions map[string]*ServiceSubscription
 	// handlers holds message handlers for each subscribed service
@@ -83,7 +81,20 @@ type TopicManager struct {
 // This constructor initializes the topic manager with the required dependencies
 // for managing overlay network service subscriptions and message routing.
 func NewTopicManager(storage StorageInterface, lookupService *LookupService) *TopicManager {
+	doc := TopicManagerDocumentation
 	return &TopicManager{
+		BaseTopicManagerOps: shared.NewBaseTopicManagerOps(shared.BaseTopicManagerConfig{
+			Admittance: shared.AdmittanceConfig{
+				Identifier:   "SLAP",
+				TopicPrefix:  "ls_",
+				EmojiAdmit:   "\U0001f44f",
+				EmojiConsume: "\u270b",
+				EmojiNone:    "\U0001f615",
+			},
+			MetaDataName:        "SLAP Topic Manager",
+			MetaDataDescription: "Manages SLAP protocol topics for service lookup and availability tracking",
+			Documentation:       &doc,
+		}),
 		subscriptions: make(map[string]*ServiceSubscription),
 		handlers:      make(map[string]ServiceMessageHandler),
 		storage:       storage,
@@ -374,120 +385,5 @@ func (tm *TopicManager) GetAvailableServices() []string {
 	return services
 }
 
-// IdentifyAdmissibleOutputs implements the engine.TopicManager interface
-// For SLAP, this identifies outputs that should be admitted to the overlay
-func (tm *TopicManager) IdentifyAdmissibleOutputs(ctx context.Context, beef []byte, previousCoins map[uint32]*transaction.TransactionOutput) (overlay.AdmittanceInstructions, error) {
-	outputsToAdmit := []uint32{}
-
-	// Parse transaction from BEEF format
-	parsedTransaction, err := transaction.NewTransactionFromBEEF(beef)
-	if err != nil {
-		// Only log error if no outputs were admitted and no previous coins consumed
-		if len(outputsToAdmit) == 0 && len(previousCoins) == 0 {
-			log.Printf("🤚 Error identifying admissible outputs: %v", err)
-		}
-		return overlay.AdmittanceInstructions{
-			OutputsToAdmit: outputsToAdmit,
-			CoinsToRetain:  []uint32{},
-		}, nil
-	}
-
-	// Check each output for SLAP token validity
-	for i, output := range parsedTransaction.Outputs {
-		// Decode PushDrop token
-		result := pushdrop.Decode(output.LockingScript)
-		if result == nil {
-			continue // It's common for other outputs to be invalid; no need to log an error here
-		}
-
-		// SLAP tokens must have exactly 5 fields
-		if len(result.Fields) != 5 {
-			continue
-		}
-
-		// Check SLAP identifier (first field)
-		slapIdentifier := utils.UTFBytesToString(result.Fields[0])
-		if slapIdentifier != "SLAP" {
-			continue
-		}
-
-		// Check advertised URI (third field)
-		advertisedURI := utils.UTFBytesToString(result.Fields[2])
-		if !utils.IsAdvertisableURI(advertisedURI) {
-			continue
-		}
-
-		// Check topic name (fourth field)
-		topic := utils.UTFBytesToString(result.Fields[3])
-		if !utils.IsValidTopicOrServiceName(topic) {
-			continue
-		}
-
-		// SLAP only accepts "ls_" (lookup service) advertisements
-		if !strings.HasPrefix(topic, "ls_") {
-			continue
-		}
-
-		// Check token signature linkage
-		lockingPublicKey := result.LockingPublicKey.ToDERHex()
-		tokenFields := make(utils.TokenFields, len(result.Fields))
-		copy(tokenFields, result.Fields)
-
-		// For now, use mock wallet - in production this should be the real wallet
-		if valid, err := utils.IsTokenSignatureCorrectlyLinked(ctx, lockingPublicKey, tokenFields); err == nil && valid {
-			if i >= 0 && i <= 0xFFFFFFFF {
-				outputsToAdmit = append(outputsToAdmit, uint32(i))
-			}
-		} else if err == nil && !valid {
-			slog.Info("Invalid token signature linkage", "outputIndex", i, "txid", parsedTransaction.TxID())
-		}
-	}
-
-	// Friendly logging with slappy emojis
-	if len(outputsToAdmit) > 0 {
-		if len(outputsToAdmit) == 1 {
-			log.Printf("👏 Admitted %d SLAP output!", len(outputsToAdmit))
-		} else {
-			log.Printf("👏 Admitted %d SLAP outputs!", len(outputsToAdmit))
-		}
-	}
-
-	if len(previousCoins) > 0 {
-		if len(previousCoins) == 1 {
-			log.Printf("✋ Consumed %d previous SLAP coin!", len(previousCoins))
-		} else {
-			log.Printf("✋ Consumed %d previous SLAP coins!", len(previousCoins))
-		}
-	}
-
-	if len(outputsToAdmit) == 0 && len(previousCoins) == 0 {
-		log.Printf("😕 No SLAP outputs admitted and no previous SLAP coins consumed.")
-	}
-
-	return overlay.AdmittanceInstructions{
-		OutputsToAdmit: outputsToAdmit,
-		CoinsToRetain:  []uint32{},
-	}, nil
-}
-
-// IdentifyNeededInputs implements the engine.TopicManager interface
-// For SLAP, this identifies inputs needed for validation
-func (tm *TopicManager) IdentifyNeededInputs(_ context.Context, _ []byte) ([]*transaction.Outpoint, error) {
-	// SLAP doesn't require specific inputs for validation
-	return []*transaction.Outpoint{}, nil
-}
-
-// GetDocumentation implements the engine.TopicManager interface
-// Returns documentation for the SLAP topic manager
-func (tm *TopicManager) GetDocumentation() string {
-	return TopicManagerDocumentation
-}
-
-// GetMetaData implements the engine.TopicManager interface
-// Returns metadata about the SLAP topic manager
-func (tm *TopicManager) GetMetaData() *overlay.MetaData {
-	return &overlay.MetaData{
-		Name:        "SLAP Topic Manager",
-		Description: "Manages SLAP protocol topics for service lookup and availability tracking",
-	}
-}
+// The IdentifyAdmissibleOutputs, IdentifyNeededInputs, GetDocumentation, and GetMetaData
+// methods are provided by the embedded shared.BaseTopicManagerOps struct.
