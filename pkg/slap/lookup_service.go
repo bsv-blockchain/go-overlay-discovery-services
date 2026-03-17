@@ -7,9 +7,7 @@ import (
 	"errors"
 
 	"github.com/bsv-blockchain/go-overlay-services/pkg/core/engine"
-	"github.com/bsv-blockchain/go-sdk/overlay"
 	"github.com/bsv-blockchain/go-sdk/overlay/lookup"
-	"github.com/bsv-blockchain/go-sdk/transaction"
 
 	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/shared"
 	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
@@ -36,8 +34,8 @@ var (
 // It provides lookup capabilities for SLAP tokens within the overlay network,
 // allowing discovery of nodes that offer specific services.
 type LookupService struct {
-	// DiscoveryNoOps provides no-op implementations for methods not relevant to discovery services
-	shared.DiscoveryNoOps
+	// BaseLookupService provides shared implementations for common lookup operations
+	shared.BaseLookupService
 
 	// storage is the SLAP storage implementation
 	storage StorageInterface
@@ -48,42 +46,21 @@ var _ engine.LookupService = (*LookupService)(nil)
 
 // NewLookupService creates a new SLAP lookup service instance.
 func NewLookupService(storage StorageInterface) *LookupService {
+	doc := LookupDocumentation
 	return &LookupService{
+		BaseLookupService: shared.NewBaseLookupService(shared.BaseLookupConfig{
+			Topic:               Topic,
+			ServiceID:           Service,
+			Identifier:          Identifier,
+			MetaDataName:        "SLAP Lookup Service",
+			MetaDataDescription: "Provides lookup capabilities for SLAP tokens.",
+			Documentation:       &doc,
+			StoreRecord:         storage.StoreSLAPRecord,
+			DeleteRecord:        storage.DeleteSLAPRecord,
+			FindAll:             storage.FindAll,
+		}),
 		storage: storage,
 	}
-}
-
-// OutputAdmittedByTopic handles an output being admitted by topic.
-// This method processes SLAP advertisements encoded in locking scripts using PushDrop format.
-// It validates the protocol identifier and stores the SLAP record if valid.
-//
-// Expected PushDrop fields:
-//   - fields[0]: Protocol identifier (must be "SLAP")
-//   - fields[1]: Identity key in hex format
-//   - fields[2]: Domain string
-//   - fields[3]: Service name supported
-func (s *LookupService) OutputAdmittedByTopic(ctx context.Context, payload *engine.OutputAdmittedByTopic) error {
-	fields, err := shared.ParsePushDropOutput(payload, Topic, Identifier)
-	if err != nil {
-		return err
-	}
-	if fields == nil {
-		return nil // Silently ignore non-matching topics/protocols
-	}
-
-	return s.storage.StoreSLAPRecord(ctx, fields.Txid, fields.OutputIndex, fields.IdentityKey, fields.Domain, fields.FourthField)
-}
-
-// OutputSpent handles an output being spent.
-// This method removes the corresponding SLAP record when the UTXO is spent.
-func (s *LookupService) OutputSpent(ctx context.Context, payload *engine.OutputSpent) error {
-	return shared.HandleOutputSpent(ctx, payload, Topic, s.storage.DeleteSLAPRecord)
-}
-
-// OutputEvicted handles an output being evicted.
-// This method removes the corresponding SLAP record when the UTXO is evicted from the mempool.
-func (s *LookupService) OutputEvicted(ctx context.Context, outpoint *transaction.Outpoint) error {
-	return shared.HandleOutputEvicted(ctx, outpoint, s.storage.DeleteSLAPRecord)
 }
 
 // Lookup performs a lookup query and returns matching results.
@@ -94,17 +71,7 @@ func (s *LookupService) OutputEvicted(ctx context.Context, outpoint *transaction
 //   - String "findAll": Returns all SLAP records
 //   - Object with SLAPQuery fields: Filters by domain, service, identityKey with pagination
 func (s *LookupService) Lookup(ctx context.Context, question *lookup.LookupQuestion) (*lookup.LookupAnswer, error) {
-	return shared.ExecuteLookup(ctx, question, s)
-}
-
-// ServiceName returns the SLAP service identifier for the shared lookup executor.
-func (s *LookupService) ServiceName() string {
-	return Service
-}
-
-// FindAll returns all SLAP records with optional pagination (implements shared.QueryExecutor).
-func (s *LookupService) FindAll(ctx context.Context, limit, skip *int, sortOrder *types.SortOrder) ([]types.UTXOReference, error) {
-	return s.storage.FindAll(ctx, limit, skip, sortOrder)
+	return s.BaseLookupService.Lookup(ctx, question, s)
 }
 
 // ParseAndExecuteQuery parses a raw query into a SLAPQuery, validates it,
@@ -150,21 +117,4 @@ func (s *LookupService) validateQuery(query *types.SLAPQuery) error {
 
 	// Validate pagination parameters
 	return shared.ValidatePagination(query.Limit, query.Skip, query.SortOrder)
-}
-
-// GetDocumentation returns the service documentation.
-// This method provides comprehensive documentation about the SLAP lookup service,
-// including usage examples and best practices.
-func (s *LookupService) GetDocumentation() string {
-	return LookupDocumentation
-}
-
-// GetMetaData returns the service metadata.
-// This method provides basic information about the SLAP lookup service
-// including name and description.
-func (s *LookupService) GetMetaData() *overlay.MetaData {
-	return &overlay.MetaData{
-		Name:        "SLAP Lookup Service",
-		Description: "Provides lookup capabilities for SLAP tokens.",
-	}
 }

@@ -7,9 +7,7 @@ import (
 	"errors"
 
 	"github.com/bsv-blockchain/go-overlay-services/pkg/core/engine"
-	"github.com/bsv-blockchain/go-sdk/overlay"
 	"github.com/bsv-blockchain/go-sdk/overlay/lookup"
-	"github.com/bsv-blockchain/go-sdk/transaction"
 
 	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/shared"
 	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
@@ -35,8 +33,8 @@ var (
 // It provides lookup capabilities for SHIP tokens within the overlay network,
 // allowing discovery of nodes that host specific topics.
 type LookupService struct {
-	// DiscoveryNoOps provides no-op implementations for methods not relevant to discovery services
-	shared.DiscoveryNoOps
+	// BaseLookupService provides shared implementations for common lookup operations
+	shared.BaseLookupService
 
 	// storage is the SHIP storage implementation
 	storage StorageInterface
@@ -47,42 +45,21 @@ var _ engine.LookupService = (*LookupService)(nil)
 
 // NewLookupService creates a new SHIP lookup service instance.
 func NewLookupService(storage StorageInterface) *LookupService {
+	doc := LookupDocumentation
 	return &LookupService{
+		BaseLookupService: shared.NewBaseLookupService(shared.BaseLookupConfig{
+			Topic:               Topic,
+			ServiceID:           Service,
+			Identifier:          Identifier,
+			MetaDataName:        "SHIP Lookup Service",
+			MetaDataDescription: "Provides lookup capabilities for SHIP tokens.",
+			Documentation:       &doc,
+			StoreRecord:         storage.StoreSHIPRecord,
+			DeleteRecord:        storage.DeleteSHIPRecord,
+			FindAll:             storage.FindAll,
+		}),
 		storage: storage,
 	}
-}
-
-// OutputAdmittedByTopic handles an output being admitted by topic.
-// This method processes SHIP advertisements encoded in locking scripts using PushDrop format.
-// It validates the protocol identifier and stores the SHIP record if valid.
-//
-// Expected PushDrop fields:
-//   - fields[0]: Protocol identifier (must be "SHIP")
-//   - fields[1]: Identity key in hex format
-//   - fields[2]: Domain string
-//   - fields[3]: Topic/service supported
-func (s *LookupService) OutputAdmittedByTopic(ctx context.Context, payload *engine.OutputAdmittedByTopic) error {
-	fields, err := shared.ParsePushDropOutput(payload, Topic, Identifier)
-	if err != nil {
-		return err
-	}
-	if fields == nil {
-		return nil // Silently ignore non-matching topics/protocols
-	}
-
-	return s.storage.StoreSHIPRecord(ctx, fields.Txid, fields.OutputIndex, fields.IdentityKey, fields.Domain, fields.FourthField)
-}
-
-// OutputSpent handles an output being spent.
-// This method removes the corresponding SHIP record when the UTXO is spent.
-func (s *LookupService) OutputSpent(ctx context.Context, payload *engine.OutputSpent) error {
-	return shared.HandleOutputSpent(ctx, payload, Topic, s.storage.DeleteSHIPRecord)
-}
-
-// OutputEvicted handles an output being evicted.
-// This method removes the corresponding SHIP record when the UTXO is evicted from the mempool.
-func (s *LookupService) OutputEvicted(ctx context.Context, outpoint *transaction.Outpoint) error {
-	return shared.HandleOutputEvicted(ctx, outpoint, s.storage.DeleteSHIPRecord)
 }
 
 // Lookup performs a lookup query and returns matching results.
@@ -93,17 +70,7 @@ func (s *LookupService) OutputEvicted(ctx context.Context, outpoint *transaction
 //   - String "findAll": Returns all SHIP records
 //   - Object with SHIPQuery fields: Filters by domain, topics, identityKey with pagination
 func (s *LookupService) Lookup(ctx context.Context, question *lookup.LookupQuestion) (*lookup.LookupAnswer, error) {
-	return shared.ExecuteLookup(ctx, question, s)
-}
-
-// ServiceName returns the SHIP service identifier for the shared lookup executor.
-func (s *LookupService) ServiceName() string {
-	return Service
-}
-
-// FindAll returns all SHIP records with optional pagination (implements shared.QueryExecutor).
-func (s *LookupService) FindAll(ctx context.Context, limit, skip *int, sortOrder *types.SortOrder) ([]types.UTXOReference, error) {
-	return s.storage.FindAll(ctx, limit, skip, sortOrder)
+	return s.BaseLookupService.Lookup(ctx, question, s)
 }
 
 // ParseAndExecuteQuery parses a raw query into a SHIPQuery, validates it,
@@ -146,21 +113,4 @@ func (s *LookupService) validateQuery(query *types.SHIPQuery) error {
 
 	// Validate pagination parameters
 	return shared.ValidatePagination(query.Limit, query.Skip, query.SortOrder)
-}
-
-// GetDocumentation returns the service documentation.
-// This method provides comprehensive documentation about the SHIP lookup service,
-// including usage examples and best practices.
-func (s *LookupService) GetDocumentation() string {
-	return LookupDocumentation
-}
-
-// GetMetaData returns the service metadata.
-// This method provides basic information about the SHIP lookup service
-// including name and description.
-func (s *LookupService) GetMetaData() *overlay.MetaData {
-	return &overlay.MetaData{
-		Name:        "SHIP Lookup Service",
-		Description: "Provides lookup capabilities for SHIP tokens.",
-	}
 }

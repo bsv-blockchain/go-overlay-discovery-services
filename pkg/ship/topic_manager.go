@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/bsv-blockchain/go-sdk/overlay"
-	"github.com/bsv-blockchain/go-sdk/transaction"
 
 	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/shared"
 )
@@ -55,6 +54,9 @@ type TopicMessageHandler func(ctx context.Context, message TopicMessage) error
 // It provides capabilities for subscribing to overlay network topics, handling messages,
 // and managing topic lifecycle within the SHIP ecosystem.
 type TopicManager struct {
+	// BaseTopicManagerOps provides shared implementations for engine.TopicManager interface methods
+	shared.BaseTopicManagerOps
+
 	// subscriptions holds all active topic subscriptions
 	subscriptions map[string]*TopicSubscription
 	// handlers holds message handlers for each subscribed topic
@@ -71,7 +73,20 @@ type TopicManager struct {
 // This constructor initializes the topic manager with the required dependencies
 // for managing overlay network topic subscriptions and message routing.
 func NewTopicManager(storage StorageInterface, lookupService *LookupService) *TopicManager {
+	doc := TopicManagerDocumentation
 	return &TopicManager{
+		BaseTopicManagerOps: shared.NewBaseTopicManagerOps(shared.BaseTopicManagerConfig{
+			Admittance: shared.AdmittanceConfig{
+				Identifier:   "SHIP",
+				TopicPrefix:  "tm_",
+				EmojiAdmit:   "\U0001f6f3\ufe0f",
+				EmojiConsume: "\U0001f6a2",
+				EmojiNone:    "\u2693",
+			},
+			MetaDataName:        "SHIP Topic Manager",
+			MetaDataDescription: "Manages SHIP protocol topics for service host interconnection and discovery",
+			Documentation:       &doc,
+		}),
 		subscriptions: make(map[string]*TopicSubscription),
 		handlers:      make(map[string]TopicMessageHandler),
 		storage:       storage,
@@ -294,35 +309,5 @@ func (tm *TopicManager) GetTotalMessageCount() int64 {
 	return total
 }
 
-// IdentifyAdmissibleOutputs implements the engine.TopicManager interface
-// For SHIP, this identifies outputs that should be admitted to the overlay
-func (tm *TopicManager) IdentifyAdmissibleOutputs(ctx context.Context, beef []byte, previousCoins map[uint32]*transaction.TransactionOutput) (overlay.AdmittanceInstructions, error) {
-	return shared.IdentifyAdmissibleOutputs(ctx, beef, previousCoins, shared.AdmittanceConfig{
-		Identifier:   "SHIP",
-		TopicPrefix:  "tm_",
-		EmojiAdmit:   "\U0001f6f3\ufe0f",
-		EmojiConsume: "\U0001f6a2",
-		EmojiNone:    "\u2693",
-	})
-}
-
-// IdentifyNeededInputs implements the engine.TopicManager interface
-// For SHIP, this identifies inputs needed for validation
-func (tm *TopicManager) IdentifyNeededInputs(_ context.Context, _ []byte) ([]*transaction.Outpoint, error) {
-	return shared.IdentifyNeededInputsNoOp()
-}
-
-// GetDocumentation implements the engine.TopicManager interface
-// Returns documentation for the SHIP topic manager
-func (tm *TopicManager) GetDocumentation() string {
-	return TopicManagerDocumentation
-}
-
-// GetMetaData implements the engine.TopicManager interface
-// Returns metadata about the SHIP topic manager
-func (tm *TopicManager) GetMetaData() *overlay.MetaData {
-	return &overlay.MetaData{
-		Name:        "SHIP Topic Manager",
-		Description: "Manages SHIP protocol topics for service host interconnection and discovery",
-	}
-}
+// The IdentifyAdmissibleOutputs, IdentifyNeededInputs, GetDocumentation, and GetMetaData
+// methods are provided by the embedded shared.BaseTopicManagerOps struct.
