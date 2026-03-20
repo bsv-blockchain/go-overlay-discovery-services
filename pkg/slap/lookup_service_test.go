@@ -103,6 +103,21 @@ func createValidPushDropScript(fields [][]byte) string {
 
 // createValidPushDropResult helper removed - using real PushDrop scripts instead
 
+// createTestBEEFWithScript builds a minimal transaction with one output using the given script,
+// serializes it as atomic BEEF, and returns the bytes together with the txid hex.
+func createTestBEEFWithScript(s *script.Script) ([]byte, string, error) {
+	tx := transaction.NewTransaction()
+	tx.AddOutput(&transaction.TransactionOutput{
+		Satoshis:      1000,
+		LockingScript: s,
+	})
+	beefBytes, err := tx.AtomicBEEF(true)
+	if err != nil {
+		return nil, "", err
+	}
+	return beefBytes, hex.EncodeToString(tx.TxID().CloneBytes()), nil
+}
+
 // Test NewLookupService
 
 func TestNewSLAPLookupService(t *testing.T) {
@@ -130,25 +145,17 @@ func TestOutputAdmittedByTopic_Success(t *testing.T) {
 	scriptObj, err := script.NewFromHex(validScriptHex)
 	require.NoError(t, err)
 
-	// Create outpoint
-	txidBytes, err := hex.DecodeString(TxID)
+	beefBytes, txidHex, err := createTestBEEFWithScript(scriptObj)
 	require.NoError(t, err)
-	var txidArray [32]byte
-	copy(txidArray[:], txidBytes)
-
-	outpoint := &transaction.Outpoint{
-		Txid:  txidArray,
-		Index: 0,
-	}
 
 	payload := &engine.OutputAdmittedByTopic{
-		Topic:         Topic,
-		Outpoint:      outpoint,
-		LockingScript: scriptObj,
+		Topic:       Topic,
+		OutputIndex: 0,
+		AtomicBEEF:  beefBytes,
 	}
 
-	// Set up mock for storage (txid is now hex-encoded from outpoint)
-	mockStorage.On("StoreSLAPRecord", mock.Anything, TxID, 0, "01020304", "https://example.com", "ls_treasury").Return(nil)
+	// Set up mock for storage (txid is hex-encoded from the BEEF transaction)
+	mockStorage.On("StoreSLAPRecord", mock.Anything, txidHex, 0, "01020304", "https://example.com", "ls_treasury").Return(nil)
 
 	// Execute
 	err = service.OutputAdmittedByTopic(context.Background(), payload)
@@ -161,53 +168,28 @@ func TestOutputAdmittedByTopic_Success(t *testing.T) {
 func TestOutputAdmittedByTopic_IgnoreNonSLAPTopic(t *testing.T) {
 	service, _ := createTestSLAPLookupService()
 
-	// Create invalid script that can't be decoded
-	scriptObj, err := script.NewFromHex("deadbeef")
-	require.NoError(t, err)
-
-	// Create outpoint
-	txidBytes, err := hex.DecodeString(TxID)
-	require.NoError(t, err)
-	var txidArray [32]byte
-	copy(txidArray[:], txidBytes)
-
-	outpoint := &transaction.Outpoint{
-		Txid:  txidArray,
-		Index: 0,
-	}
-
 	payload := &engine.OutputAdmittedByTopic{
-		Topic:         "tm_other",
-		Outpoint:      outpoint,
-		LockingScript: scriptObj,
+		Topic: "tm_other",
 	}
 
-	err = service.OutputAdmittedByTopic(context.Background(), payload)
+	err := service.OutputAdmittedByTopic(context.Background(), payload)
 	require.NoError(t, err) // Should silently ignore non-SLAP topics
 }
 
 func TestOutputAdmittedByTopic_PushDropDecodeError(t *testing.T) {
 	service, _ := createTestSLAPLookupService()
 
-	// Create invalid script that can't be decoded
+	// Create invalid script that can't be decoded as PushDrop
 	scriptObj, err := script.NewFromHex("deadbeef")
 	require.NoError(t, err)
 
-	// Create outpoint
-	txidBytes, err := hex.DecodeString(TxID)
+	beefBytes, _, err := createTestBEEFWithScript(scriptObj)
 	require.NoError(t, err)
-	var txidArray [32]byte
-	copy(txidArray[:], txidBytes)
-
-	outpoint := &transaction.Outpoint{
-		Txid:  txidArray,
-		Index: 0,
-	}
 
 	payload := &engine.OutputAdmittedByTopic{
-		Topic:         Topic,
-		Outpoint:      outpoint,
-		LockingScript: scriptObj,
+		Topic:       Topic,
+		OutputIndex: 0,
+		AtomicBEEF:  beefBytes,
 	}
 
 	err = service.OutputAdmittedByTopic(context.Background(), payload)
@@ -227,21 +209,13 @@ func TestOutputAdmittedByTopic_InsufficientFields(t *testing.T) {
 	scriptObj, err := script.NewFromHex(invalidScriptHex)
 	require.NoError(t, err)
 
-	// Create outpoint
-	txidBytes, err := hex.DecodeString(TxID)
+	beefBytes, _, err := createTestBEEFWithScript(scriptObj)
 	require.NoError(t, err)
-	var txidArray [32]byte
-	copy(txidArray[:], txidBytes)
-
-	outpoint := &transaction.Outpoint{
-		Txid:  txidArray,
-		Index: 0,
-	}
 
 	payload := &engine.OutputAdmittedByTopic{
-		Topic:         Topic,
-		Outpoint:      outpoint,
-		LockingScript: scriptObj,
+		Topic:       Topic,
+		OutputIndex: 0,
+		AtomicBEEF:  beefBytes,
 	}
 
 	err = service.OutputAdmittedByTopic(context.Background(), payload)
@@ -264,21 +238,13 @@ func TestOutputAdmittedByTopic_IgnoreNonSLAPProtocol(t *testing.T) {
 	scriptObj, err := script.NewFromHex(validScriptHex)
 	require.NoError(t, err)
 
-	// Create outpoint
-	txidBytes, err := hex.DecodeString(TxID)
+	beefBytes, _, err := createTestBEEFWithScript(scriptObj)
 	require.NoError(t, err)
-	var txidArray [32]byte
-	copy(txidArray[:], txidBytes)
-
-	outpoint := &transaction.Outpoint{
-		Txid:  txidArray,
-		Index: 0,
-	}
 
 	payload := &engine.OutputAdmittedByTopic{
-		Topic:         Topic,
-		Outpoint:      outpoint,
-		LockingScript: scriptObj,
+		Topic:       Topic,
+		OutputIndex: 0,
+		AtomicBEEF:  beefBytes,
 	}
 
 	err = service.OutputAdmittedByTopic(context.Background(), payload)
@@ -638,24 +604,16 @@ func TestOutputAdmittedByTopic_StorageError(t *testing.T) {
 	scriptObj, err := script.NewFromHex(validScriptHex)
 	require.NoError(t, err)
 
-	// Create outpoint
-	txidBytes, err := hex.DecodeString(TxID)
+	beefBytes, txidHex, err := createTestBEEFWithScript(scriptObj)
 	require.NoError(t, err)
-	var txidArray [32]byte
-	copy(txidArray[:], txidBytes)
-
-	outpoint := &transaction.Outpoint{
-		Txid:  txidArray,
-		Index: 0,
-	}
 
 	payload := &engine.OutputAdmittedByTopic{
-		Topic:         Topic,
-		Outpoint:      outpoint,
-		LockingScript: scriptObj,
+		Topic:       Topic,
+		OutputIndex: 0,
+		AtomicBEEF:  beefBytes,
 	}
 
-	mockStorage.On("StoreSLAPRecord", mock.Anything, TxID, 0, "01020304", "https://example.com", "ls_treasury").Return(errTestStorage)
+	mockStorage.On("StoreSLAPRecord", mock.Anything, txidHex, 0, "01020304", "https://example.com", "ls_treasury").Return(errTestStorage)
 
 	err = service.OutputAdmittedByTopic(context.Background(), payload)
 	require.Error(t, err)
@@ -826,24 +784,16 @@ func TestOutputAdmittedByTopic_DifferentServices(t *testing.T) {
 			scriptObj, err := script.NewFromHex(validScriptHex)
 			require.NoError(t, err)
 
-			// Create outpoint
-			txidBytes, err := hex.DecodeString(TxID)
+			beefBytes, txidHex, err := createTestBEEFWithScript(scriptObj)
 			require.NoError(t, err)
-			var txidArray [32]byte
-			copy(txidArray[:], txidBytes)
-
-			outpoint := &transaction.Outpoint{
-				Txid:  txidArray,
-				Index: 0,
-			}
 
 			payload := &engine.OutputAdmittedByTopic{
-				Topic:         Topic,
-				Outpoint:      outpoint,
-				LockingScript: scriptObj,
+				Topic:       Topic,
+				OutputIndex: 0,
+				AtomicBEEF:  beefBytes,
 			}
 
-			mockStorage.On("StoreSLAPRecord", mock.Anything, TxID, 0, "01020304", "https://example.com", tc.serviceName).Return(nil)
+			mockStorage.On("StoreSLAPRecord", mock.Anything, txidHex, 0, "01020304", "https://example.com", tc.serviceName).Return(nil)
 
 			err = service.OutputAdmittedByTopic(context.Background(), payload)
 			require.NoError(t, err)
