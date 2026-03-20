@@ -50,48 +50,22 @@ func main() {
 func ExampleOutputAdmittedByTopic(ctx context.Context, lookupService *ship.LookupService) error {
 	logger.Info("Demonstrating OutputAdmittedByTopic API usage")
 
-	// Create a sample transaction ID (32 bytes)
-	sampleTxidHex := "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-	txidBytes, err := hex.DecodeString(sampleTxidHex)
-	if err != nil {
-		return fmt.Errorf("failed to decode sample txid: %w", err)
-	}
-
-	// Convert to [32]byte array required by transaction.Outpoint
-	var txidArray [32]byte
-	copy(txidArray[:], txidBytes)
-
-	// Create the outpoint (transaction output reference)
-	outpoint := &transaction.Outpoint{
-		Txid:  txidArray,
-		Index: 0, // First output
-	}
-
-	// Create a valid PushDrop locking script for SHIP advertisement
-	lockingScript, err := createSampleSHIPScript()
-	if err != nil {
-		return fmt.Errorf("failed to create sample SHIP script: %w", err)
-	}
-
 	// Construct the OutputAdmittedByTopic payload
-	// This structure would normally be created by the overlay engine
+	// In production, this structure is created by the overlay engine with real BEEF data.
 	payload := &engine.OutputAdmittedByTopic{
-		Topic:         ship.Topic, // "tm_ship"
-		Outpoint:      outpoint,
-		Satoshis:      1000, // Sample satoshi value
-		LockingScript: lockingScript,
-		AtomicBEEF:    []byte("sample"), // Sample atomic BEEF data
+		Topic:       ship.Topic, // "tm_ship"
+		OutputIndex: 0,
+		AtomicBEEF:  []byte("sample"), // Sample atomic BEEF data (invalid; for demo only)
 	}
 
 	// Call OutputAdmittedByTopic (this would normally be called by the engine)
-	err = lookupService.OutputAdmittedByTopic(ctx, payload)
+	err := lookupService.OutputAdmittedByTopic(ctx, payload)
 	if err != nil {
 		return fmt.Errorf("OutputAdmittedByTopic failed: %w", err)
 	}
 
 	logger.Info("Successfully processed SHIP advertisement",
-		slog.String("outpoint", sampleTxidHex),
-		slog.Int("index", int(outpoint.Index)),
+		slog.Int("outputIndex", int(payload.OutputIndex)),
 		slog.String("identityKey", "deadbeef01020304"),
 		slog.String("domain", "https://example.com"),
 		slog.String("topic", "tm_bridge"))
@@ -99,98 +73,25 @@ func ExampleOutputAdmittedByTopic(ctx context.Context, lookupService *ship.Looku
 	return nil
 }
 
-// createSampleSHIPScript creates a valid PushDrop script containing SHIP advertisement data.
-// This demonstrates the expected format for SHIP locking scripts.
-func createSampleSHIPScript() (*script.Script, error) {
-	// Create a valid public key (33 bytes) for the base script
-	pubKeyHex := "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
-	pubKeyBytes, err := hex.DecodeString(pubKeyHex)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode public key: %w", err)
-	}
-
-	// Create the script
-	s := &script.Script{}
-
-	// Add public key and OP_CHECKSIG (standard P2PK pattern)
-	if err := s.AppendPushData(pubKeyBytes); err != nil {
-		return nil, fmt.Errorf("failed to append public key: %w", err)
-	}
-	if err := s.AppendOpcodes(script.OpCHECKSIG); err != nil {
-		return nil, fmt.Errorf("failed to append OpCHECKSIG: %w", err)
-	}
-
-	// Add SHIP advertisement fields using PushDrop format
-	fields := [][]byte{
-		[]byte("SHIP"), // Protocol identifier
-		{0xde, 0xad, 0xbe, 0xef, 0x01, 0x02, 0x03, 0x04}, // Identity key
-		[]byte("https://example.com"),                    // Domain where service is hosted
-		[]byte("tm_bridge"),                              // Topic/service supported
-	}
-
-	// Add fields to script
-	for _, field := range fields {
-		if err := s.AppendPushData(field); err != nil {
-			return nil, fmt.Errorf("failed to append field to script: %w", err)
-		}
-	}
-
-	// Add DROP operations to clean up stack (PushDrop pattern)
-	notYetDropped := len(fields)
-	for notYetDropped > 1 {
-		if err := s.AppendOpcodes(script.Op2DROP); err != nil {
-			return nil, fmt.Errorf("failed to append Op2DROP: %w", err)
-		}
-		notYetDropped -= 2
-	}
-	if notYetDropped != 0 {
-		if err := s.AppendOpcodes(script.OpDROP); err != nil {
-			return nil, fmt.Errorf("failed to append OpDROP: %w", err)
-		}
-	}
-
-	return s, nil
-}
-
 // ExampleOutputAdmittedByTopicDemo demonstrates the API structure for OutputAdmittedByTopic
 // without requiring actual storage. This shows developers the expected data structures.
 func ExampleOutputAdmittedByTopicDemo() {
 	logger.Info("OutputAdmittedByTopic API Structure Demo:")
 
-	// Sample transaction ID
 	sampleTxidHex := "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-	txidBytes, _ := hex.DecodeString(sampleTxidHex)
-	var txidArray [32]byte
-	copy(txidArray[:], txidBytes)
-
-	// Create sample outpoint
-	outpoint := &transaction.Outpoint{
-		Txid:  txidArray,
-		Index: 0,
-	}
-
-	// Create sample locking script
-	lockingScript, err := createSampleSHIPScript()
-	if err != nil {
-		log.Printf("Failed to create sample script: %v", err)
-		return
-	}
 
 	// Show the structure that would be passed to OutputAdmittedByTopic
+	// In production, AtomicBEEF is provided by the overlay engine.
 	payload := &engine.OutputAdmittedByTopic{
-		Topic:         ship.Topic, // "tm_ship"
-		Outpoint:      outpoint,
-		Satoshis:      1000,
-		LockingScript: lockingScript,
-		AtomicBEEF:    []byte("sample"),
+		Topic:       ship.Topic, // "tm_ship"
+		OutputIndex: 0,
+		AtomicBEEF:  []byte("sample"),
 	}
 
 	logger.Info("OutputAdmittedByTopic API Structure Demo",
 		slog.String("topic", payload.Topic),
 		slog.String("outpoint", sampleTxidHex),
-		slog.Int("index", int(payload.Outpoint.Index)),
-		slog.Uint64("satoshis", payload.Satoshis),
-		slog.String("lockingScript", lockingScript.String()))
+		slog.Int("outputIndex", int(payload.OutputIndex)))
 	logger.Info("Expected SHIP fields in script",
 		slog.String("protocol", "SHIP"),
 		slog.String("identityKey", "deadbeef01020304"),
