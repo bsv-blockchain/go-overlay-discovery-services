@@ -6,8 +6,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
 	"github.com/bsv-blockchain/go-sdk/overlay/lookup"
+
+	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
 )
 
 // Common error variables for lookup execution.
@@ -72,7 +73,7 @@ func ExecuteLookup(ctx context.Context, question *lookup.LookupQuestion, executo
 
 // ParseQueryJSON is a helper that marshals a raw query interface to JSON and
 // unmarshals it into the target type. Used by both SHIP and SLAP parseQueryObject methods.
-func ParseQueryJSON(query interface{}, target interface{}) error {
+func ParseQueryJSON(query, target interface{}) error {
 	jsonBytes, err := json.Marshal(query)
 	if err != nil {
 		return fmt.Errorf("failed to marshal query object: %w", err)

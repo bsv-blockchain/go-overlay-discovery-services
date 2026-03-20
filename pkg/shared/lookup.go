@@ -3,8 +3,9 @@ package shared
 import (
 	"errors"
 
-	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
 	"github.com/bsv-blockchain/go-sdk/overlay/lookup"
+
+	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
 )
 
 // Common error variables shared between SHIP and SLAP lookup validation.
@@ -15,7 +16,7 @@ var (
 )
 
 // ValidatePagination validates limit, skip, and sortOrder query parameters.
-func ValidatePagination(limit *int, skip *int, sortOrder *types.SortOrder) error {
+func ValidatePagination(limit, skip *int, sortOrder *types.SortOrder) error {
 	if limit != nil {
 		if *limit < 0 {
 			return ErrQueryLimitInvalid

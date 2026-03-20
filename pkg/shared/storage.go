@@ -22,7 +22,7 @@ func UTXOProjection() bson.M {
 }
 
 // ApplyPaginationOpts configures sort, skip, and limit on find options.
-func ApplyPaginationOpts(findOpts *options.FindOptions, sortOrder *types.SortOrder, skip *int, limit *int) {
+func ApplyPaginationOpts(findOpts *options.FindOptions, sortOrder *types.SortOrder, skip, limit *int) {
 	// Set sort order (default to descending by createdAt)
 	mongoSortOrder := -1 // descending
 	if sortOrder != nil && *sortOrder == types.SortOrderAsc {

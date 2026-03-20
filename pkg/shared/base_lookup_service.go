@@ -3,11 +3,12 @@ package shared
 import (
 	"context"
 
-	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
 	"github.com/bsv-blockchain/go-overlay-services/pkg/core/engine"
 	"github.com/bsv-blockchain/go-sdk/overlay"
 	"github.com/bsv-blockchain/go-sdk/overlay/lookup"
 	"github.com/bsv-blockchain/go-sdk/transaction"
+
+	"github.com/bsv-blockchain/go-overlay-discovery-services/pkg/types"
 )
 
 // StoreRecordFunc is the function signature for storing a record parsed from PushDrop output.
