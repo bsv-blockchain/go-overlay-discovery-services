@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/bsv-blockchain/go-overlay-services/pkg/core/engine"
+	"github.com/bsv-blockchain/go-sdk/transaction"
 	"github.com/bsv-blockchain/go-sdk/transaction/template/pushdrop"
 )
 
@@ -13,6 +14,8 @@ import (
 var (
 	ErrPushDropDecodeFailed  = errors.New("failed to decode PushDrop locking script")
 	ErrInvalidPushDropFields = errors.New("invalid PushDrop result: expected at least 4 fields")
+	ErrBEEFParseFailed       = errors.New("failed to parse atomic BEEF")
+	ErrOutputIndexOutOfRange = errors.New("output index out of range")
 )
 
 // PushDropFields holds the parsed fields from a PushDrop locking script.
@@ -34,8 +37,20 @@ func ParsePushDropOutput(payload *engine.OutputAdmittedByTopic, expectedTopic, e
 		return nil, nil //nolint:nilnil // nil,nil means silently skip
 	}
 
+	// Parse the atomic BEEF to extract the transaction
+	tx, err := transaction.NewTransactionFromBEEF(payload.AtomicBEEF)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrBEEFParseFailed, err)
+	}
+	if tx == nil {
+		return nil, ErrBEEFParseFailed
+	}
+	if int(payload.OutputIndex) >= len(tx.Outputs) {
+		return nil, fmt.Errorf("%w: index %d, outputs %d", ErrOutputIndexOutOfRange, payload.OutputIndex, len(tx.Outputs))
+	}
+
 	// Decode the PushDrop locking script
-	result := pushdrop.Decode(payload.LockingScript)
+	result := pushdrop.Decode(tx.Outputs[payload.OutputIndex].LockingScript)
 	if result == nil {
 		return nil, ErrPushDropDecodeFailed
 	}
@@ -55,7 +70,7 @@ func ParsePushDropOutput(payload *engine.OutputAdmittedByTopic, expectedTopic, e
 		IdentityKey: hex.EncodeToString(result.Fields[1]),
 		Domain:      string(result.Fields[2]),
 		FourthField: string(result.Fields[3]),
-		Txid:        hex.EncodeToString(payload.Outpoint.Txid[:]),
-		OutputIndex: int(payload.Outpoint.Index),
+		Txid:        hex.EncodeToString(tx.TxID().CloneBytes()),
+		OutputIndex: int(payload.OutputIndex),
 	}, nil
 }
