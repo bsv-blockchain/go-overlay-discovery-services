@@ -3,6 +3,7 @@ package shared
 import (
 	"context"
 
+	"github.com/bsv-blockchain/go-sdk/chainhash"
 	"github.com/bsv-blockchain/go-sdk/overlay"
 	"github.com/bsv-blockchain/go-sdk/transaction"
 )
@@ -33,13 +34,13 @@ func NewBaseTopicManagerOps(cfg BaseTopicManagerConfig) BaseTopicManagerOps {
 
 // IdentifyAdmissibleOutputs implements the engine.TopicManager interface.
 // It delegates to the shared IdentifyAdmissibleOutputs function with protocol-specific config.
-func (b *BaseTopicManagerOps) IdentifyAdmissibleOutputs(ctx context.Context, beef []byte, previousCoins map[uint32]*transaction.TransactionOutput) (overlay.AdmittanceInstructions, error) {
-	return IdentifyAdmissibleOutputs(ctx, beef, previousCoins, b.Cfg.Admittance)
+func (b *BaseTopicManagerOps) IdentifyAdmissibleOutputs(ctx context.Context, beef *transaction.Beef, txid *chainhash.Hash, previousCoins []uint32) (overlay.AdmittanceInstructions, error) {
+	return IdentifyAdmissibleOutputs(ctx, beef, txid, previousCoins, b.Cfg.Admittance)
 }
 
 // IdentifyNeededInputs implements the engine.TopicManager interface.
 // Discovery protocols don't require specific inputs for validation.
-func (b *BaseTopicManagerOps) IdentifyNeededInputs(_ context.Context, _ []byte) ([]*transaction.Outpoint, error) {
+func (b *BaseTopicManagerOps) IdentifyNeededInputs(_ context.Context, _ *transaction.Beef, _ *chainhash.Hash) ([]*transaction.Outpoint, error) {
 	return IdentifyNeededInputsNoOp()
 }
 
