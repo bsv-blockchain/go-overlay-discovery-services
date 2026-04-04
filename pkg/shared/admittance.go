@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/bsv-blockchain/go-sdk/chainhash"
 	"github.com/bsv-blockchain/go-sdk/overlay"
 	"github.com/bsv-blockchain/go-sdk/transaction"
 	"github.com/bsv-blockchain/go-sdk/transaction/template/pushdrop"
@@ -29,14 +30,14 @@ type AdmittanceConfig struct {
 
 // IdentifyAdmissibleOutputs is the shared implementation for SHIP and SLAP topic managers.
 // It parses the BEEF transaction, validates PushDrop tokens, and returns admittance instructions.
-func IdentifyAdmissibleOutputs(ctx context.Context, beef []byte, previousCoins map[uint32]*transaction.TransactionOutput, cfg AdmittanceConfig) (overlay.AdmittanceInstructions, error) {
+func IdentifyAdmissibleOutputs(ctx context.Context, beef *transaction.Beef, txid *chainhash.Hash, previousCoins []uint32, cfg AdmittanceConfig) (overlay.AdmittanceInstructions, error) {
 	outputsToAdmit := []uint32{}
 
-	// Parse transaction from BEEF format
-	parsedTransaction, err := transaction.NewTransactionFromBEEF(beef)
-	if err != nil {
+	// Find the target transaction within the BEEF structure
+	parsedTransaction := beef.FindTransactionByHash(txid)
+	if parsedTransaction == nil {
 		if len(previousCoins) == 0 {
-			log.Printf("%s Error identifying admissible outputs: %v", cfg.EmojiNone, err)
+			log.Printf("%s Error identifying admissible outputs: transaction %s not found in BEEF", cfg.EmojiNone, txid)
 		}
 		return overlay.AdmittanceInstructions{
 			OutputsToAdmit: outputsToAdmit,
@@ -99,7 +100,7 @@ func validateOutput(ctx context.Context, i int, output *transaction.TransactionO
 }
 
 // logAdmittanceResults logs the outcome of the admittance check.
-func logAdmittanceResults(outputsToAdmit []uint32, previousCoins map[uint32]*transaction.TransactionOutput, cfg AdmittanceConfig) {
+func logAdmittanceResults(outputsToAdmit []uint32, previousCoins []uint32, cfg AdmittanceConfig) {
 	if len(outputsToAdmit) > 0 {
 		suffix := pluralSuffix(len(outputsToAdmit))
 		log.Printf("%s Admitted %d %s output%s!", cfg.EmojiAdmit, len(outputsToAdmit), cfg.Identifier, suffix)
