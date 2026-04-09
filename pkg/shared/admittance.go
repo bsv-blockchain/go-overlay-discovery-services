@@ -100,7 +100,7 @@ func validateOutput(ctx context.Context, i int, output *transaction.TransactionO
 }
 
 // logAdmittanceResults logs the outcome of the admittance check.
-func logAdmittanceResults(outputsToAdmit []uint32, previousCoins []uint32, cfg AdmittanceConfig) {
+func logAdmittanceResults(outputsToAdmit, previousCoins []uint32, cfg AdmittanceConfig) {
 	if len(outputsToAdmit) > 0 {
 		suffix := pluralSuffix(len(outputsToAdmit))
 		log.Printf("%s Admitted %d %s output%s!", cfg.EmojiAdmit, len(outputsToAdmit), cfg.Identifier, suffix)
