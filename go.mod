@@ -3,9 +3,9 @@ module github.com/bsv-blockchain/go-overlay-discovery-services
 go 1.26.0
 
 require (
-	github.com/bsv-blockchain/go-overlay-services v1.3.0
+	github.com/bsv-blockchain/go-overlay-services v1.3.1
 	github.com/bsv-blockchain/go-sdk v1.2.23
-	github.com/bsv-blockchain/go-wallet-toolbox v0.183.1
+	github.com/bsv-blockchain/go-wallet-toolbox v0.183.2
 	github.com/stretchr/testify v1.11.1
 	go.mongodb.org/mongo-driver v1.17.9
 )
@@ -45,10 +45,10 @@ require (
 	github.com/benbjohnson/clock v1.3.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bsv-blockchain/go-batcher v1.2.11 // indirect
-	github.com/bsv-blockchain/go-bsv-middleware v0.13.2 // indirect
+	github.com/bsv-blockchain/go-bsv-middleware v0.13.3 // indirect
 	github.com/bsv-blockchain/go-bt/v2 v2.6.3 // indirect
 	github.com/bsv-blockchain/go-chaincfg v1.5.7 // indirect
-	github.com/bsv-blockchain/go-chaintracks v1.2.5 // indirect
+	github.com/bsv-blockchain/go-chaintracks v1.2.6 // indirect
 	github.com/bsv-blockchain/go-lockfree-queue v1.1.3 // indirect
 	github.com/bsv-blockchain/go-p2p-message-bus v0.1.18 // indirect
 	github.com/bsv-blockchain/go-safe-conversion v1.1.3 // indirect
