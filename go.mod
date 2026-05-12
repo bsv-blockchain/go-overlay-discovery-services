@@ -1,11 +1,11 @@
 module github.com/bsv-blockchain/go-overlay-discovery-services
 
-go 1.26.0
+go 1.26.3
 
 require (
 	github.com/bsv-blockchain/go-overlay-services v1.3.1
 	github.com/bsv-blockchain/go-sdk v1.2.23
-	github.com/bsv-blockchain/go-wallet-toolbox v0.183.2
+	github.com/bsv-blockchain/go-wallet-toolbox v0.183.5
 	github.com/stretchr/testify v1.11.1
 	go.mongodb.org/mongo-driver v1.17.9
 )
