@@ -13,9 +13,9 @@ require (
 // Security: upgrade vulnerable dependencies
 replace github.com/gofiber/fiber/v2 => github.com/gofiber/fiber/v2 v2.52.12
 
-replace github.com/opencontainers/runc => github.com/opencontainers/runc v1.4.0
+replace github.com/opencontainers/runc => github.com/opencontainers/runc v1.5.0
 
-replace go.opentelemetry.io/otel/sdk => go.opentelemetry.io/otel/sdk v1.42.0
+replace go.opentelemetry.io/otel/sdk => go.opentelemetry.io/otel/sdk v1.44.0
 
 require (
 	filippo.io/bigmod v0.1.1-0.20260103110540-f8a47775ebe5 // indirect
@@ -56,7 +56,7 @@ require (
 	github.com/bsv-blockchain/go-teranode-p2p-client v0.2.7 // indirect
 	github.com/bsv-blockchain/go-tx-map v1.4.1 // indirect
 	github.com/bsv-blockchain/go-wire v1.2.10 // indirect
-	github.com/bsv-blockchain/teranode v0.15.2 // indirect
+	github.com/bsv-blockchain/teranode v0.16.0-beta-2 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
