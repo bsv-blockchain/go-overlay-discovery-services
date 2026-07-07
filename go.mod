@@ -5,7 +5,7 @@ go 1.26.3
 require (
 	github.com/bsv-blockchain/go-overlay-services v1.3.2
 	github.com/bsv-blockchain/go-sdk v1.2.24
-	github.com/bsv-blockchain/go-wallet-toolbox v0.183.16
+	github.com/bsv-blockchain/go-wallet-toolbox v0.183.18
 	github.com/stretchr/testify v1.11.1
 	go.mongodb.org/mongo-driver v1.17.9
 )
@@ -48,9 +48,9 @@ require (
 	github.com/bsv-blockchain/go-bsv-middleware v0.13.4 // indirect
 	github.com/bsv-blockchain/go-bt/v2 v2.6.7 // indirect
 	github.com/bsv-blockchain/go-chaincfg v1.5.10 // indirect
-	github.com/bsv-blockchain/go-chaintracks v1.2.9 // indirect
+	github.com/bsv-blockchain/go-chaintracks v1.2.10 // indirect
 	github.com/bsv-blockchain/go-lockfree-queue v1.2.0 // indirect
-	github.com/bsv-blockchain/go-p2p-message-bus v0.1.20 // indirect
+	github.com/bsv-blockchain/go-p2p-message-bus v0.1.21 // indirect
 	github.com/bsv-blockchain/go-safe-conversion v1.2.0 // indirect
 	github.com/bsv-blockchain/go-subtree v1.4.4 // indirect
 	github.com/bsv-blockchain/go-teranode-p2p-client v0.2.7 // indirect
