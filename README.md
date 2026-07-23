@@ -27,7 +27,6 @@
        &nbsp;&nbsp;&nbsp;&nbsp; <code>Quality</code> &nbsp;&nbsp;
     </td>
     <td align="left">
-       <a href="https://goreportcard.com/report/github.com/bsv-blockchain/go-overlay-discovery-services"><img src="https://goreportcard.com/badge/github.com/bsv-blockchain/go-overlay-discovery-services?style=flat-square" alt="Go Report"></a>
        <a href="https://codecov.io/gh/bsv-blockchain/go-overlay-discovery-services"><img src="https://codecov.io/gh/bsv-blockchain/go-overlay-discovery-services/branch/master/graph/badge.svg?style=flat-square" alt="Coverage"></a>
     </td>
   </tr>
