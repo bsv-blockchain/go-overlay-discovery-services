@@ -27,6 +27,15 @@ replace github.com/quic-go/quic-go => github.com/quic-go/quic-go v0.60.0
 
 replace github.com/quic-go/webtransport-go => github.com/quic-go/webtransport-go v0.11.1
 
+// Compatibility: the k8s.io v0.37.0 set (apimachinery/api/client-go) pins
+// kube-openapi v0.0.0-20260721132016-d427ff9ee9ad, whose schemaconv still
+// returns sigs.k8s.io/structured-merge-diff/v6 types. A newer kube-openapi
+// snapshot leaks into the graph that switched schemaconv to v7, which breaks
+// apimachinery's managedfields typeconverter (v6/v7 TypeDef mismatch). Pin
+// kube-openapi to the apimachinery-compatible revision until the k8s set moves
+// to v7 as a whole.
+replace k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20260721132016-d427ff9ee9ad
+
 require (
 	filippo.io/bigmod v0.1.1-0.20260103110540-f8a47775ebe5 // indirect
 	filippo.io/edwards25519 v1.2.0 // indirect
@@ -308,6 +317,5 @@ require (
 	sigs.k8s.io/json v0.0.0-20260909141634-11ed52e25bc5 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.4.2 // indirect
-	sigs.k8s.io/structured-merge-diff/v7 v7.0.0 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
