@@ -4,8 +4,8 @@ go 1.27.0
 
 require (
 	github.com/bsv-blockchain/go-overlay-services v1.3.5
-	github.com/bsv-blockchain/go-sdk v1.5.1
-	github.com/bsv-blockchain/go-wallet-toolbox v0.186.0
+	github.com/bsv-blockchain/go-sdk v1.5.2
+	github.com/bsv-blockchain/go-wallet-toolbox v0.186.3
 	github.com/stretchr/testify v1.12.1
 	go.mongodb.org/mongo-driver v1.17.10
 )
@@ -62,6 +62,7 @@ require (
 	github.com/aws/smithy-go v1.28.1 // indirect
 	github.com/benbjohnson/clock v1.3.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
+	github.com/bitcoin-sv/bdk/module/gobdk v1.2.5-0.20260526081552-cdfa7814ee5d // indirect
 	github.com/bsv-blockchain/aerospike-client-go/v8 v8.7.1-bsv5 // indirect
 	github.com/bsv-blockchain/go-batcher/v2 v2.1.0 // indirect
 	github.com/bsv-blockchain/go-bsv-middleware v0.15.1 // indirect
