@@ -88,7 +88,7 @@ func validateOutput(ctx context.Context, i int, output *transaction.TransactionO
 	valid, sigErr := utils.IsTokenSignatureCorrectlyLinked(ctx, lockingPublicKey, tokenFields)
 	if sigErr != nil || !valid {
 		if sigErr == nil {
-			slog.Info("Invalid token signature linkage", "outputIndex", i, "txid", parsedTransaction.TxID())
+			slog.Info("Invalid token signature linkage", "outputIndex", i, "txid", parsedTransaction.TxID().String())
 		}
 		return 0, false
 	}
