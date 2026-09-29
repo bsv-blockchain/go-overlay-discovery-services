@@ -96,6 +96,9 @@ func IsTokenSignatureCorrectlyLinked(ctx context.Context, lockingPublicKey strin
 	}
 	anyoneWallet, _ := wallet.NewWallet(nil)
 	verifyResult, err := anyoneWallet.VerifySignature(ctx, verifyReq, "")
+	if errors.Is(err, wallet.ErrInvalidSignature) {
+		return false, nil // go-sdk >= 1.6.0 reports a bad signature as an error; not a technical error
+	}
 	if err != nil {
 		return false, fmt.Errorf("signature verification failed: %w", err)
 	}
