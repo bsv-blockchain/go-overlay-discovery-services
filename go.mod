@@ -5,7 +5,7 @@ go 1.27.0
 require (
 	github.com/bsv-blockchain/go-overlay-services v1.3.8
 	github.com/bsv-blockchain/go-sdk v1.7.2
-	github.com/bsv-blockchain/go-wallet-toolbox v0.189.3
+	github.com/bsv-blockchain/go-wallet-toolbox v0.191.0
 	github.com/stretchr/testify v1.12.1
 	go.mongodb.org/mongo-driver v1.17.10
 )
@@ -51,7 +51,7 @@ require (
 	github.com/bsv-blockchain/go-bsv-middleware v0.16.3 // indirect
 	github.com/bsv-blockchain/go-bt/v2 v2.7.4 // indirect
 	github.com/bsv-blockchain/go-chaincfg v1.7.0 // indirect
-	github.com/bsv-blockchain/go-chaintracks v1.4.2 // indirect
+	github.com/bsv-blockchain/go-chaintracks v1.4.3 // indirect
 	github.com/bsv-blockchain/go-lockfree-queue v1.2.0 // indirect
 	github.com/bsv-blockchain/go-p2p-message-bus v0.2.0 // indirect
 	github.com/bsv-blockchain/go-safe-conversion v1.2.0 // indirect
@@ -265,7 +265,7 @@ require (
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/telemetry v0.0.0-20261009151841-97e8ea77aa2a // indirect
-	golang.org/x/term v0.46.0 // indirect
+	golang.org/x/term v0.47.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
 	golang.org/x/time v0.16.0 // indirect
 	golang.org/x/tools v0.51.0 // indirect
