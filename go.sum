@@ -88,8 +88,8 @@ github.com/bsv-blockchain/go-p2p-message-bus v0.2.0 h1:FcbX4Z3alAnnRf8qCGITEyP1+
 github.com/bsv-blockchain/go-p2p-message-bus v0.2.0/go.mod h1:DbZfXPRTNqbM1d9rKOfGLCKV7wEt4481JWTzu4Fnp0U=
 github.com/bsv-blockchain/go-safe-conversion v1.2.0 h1:HwLWaxqm2OyU5/2BRQ8kwdn25QyX2HXr0JkfSyTG3DU=
 github.com/bsv-blockchain/go-safe-conversion v1.2.0/go.mod h1:62Eq2980j4BygfqJhd/ObGRHET8ubEy2rBdGi4k6nsw=
-github.com/bsv-blockchain/go-sdk v1.7.3 h1:U4NuOoJcn3NPgzGyc0GPrGQygya6stRDxlfJC8ksUx0=
-github.com/bsv-blockchain/go-sdk v1.7.3/go.mod h1:hLPo1JjumHrtPrRwwVMO1y5ukIUx7+CzkelDxDm+7H4=
+github.com/bsv-blockchain/go-sdk v1.7.4 h1:FqeReOBYNOgUBF4/qTQqqpOrSjD8sRhTu2RIT/G8ZMc=
+github.com/bsv-blockchain/go-sdk v1.7.4/go.mod h1:JrqAZhpbJmob3+ouaXGCQPU08OBwWLxOV9rurOaVZs4=
 github.com/bsv-blockchain/go-subtree v1.6.3 h1:75dwSs1tQsXRIRBImEsGFTlROXXQF192fA2UjjJQT8M=
 github.com/bsv-blockchain/go-subtree v1.6.3/go.mod h1:q7YXgbNQnqZSKTaP8lMQyCApQzrKJdYsF64OMyVYT0k=
 github.com/bsv-blockchain/go-teranode-p2p-client v0.3.3 h1:GlSZpVAtgLv+8piSsx7WwzcEvtea5UA8KSPV/pa7OIg=
