@@ -1,11 +1,11 @@
 module github.com/bsv-blockchain/go-overlay-discovery-services
 
-go 1.27.3
+go 1.27.4
 
 require (
-	github.com/bsv-blockchain/go-overlay-services v1.3.8
-	github.com/bsv-blockchain/go-sdk v1.7.4
-	github.com/bsv-blockchain/go-wallet-toolbox v0.191.4
+	github.com/bsv-blockchain/go-overlay-services v1.3.9
+	github.com/bsv-blockchain/go-sdk v1.7.5
+	github.com/bsv-blockchain/go-wallet-toolbox v0.191.6
 	github.com/stretchr/testify v1.12.1
 	go.mongodb.org/mongo-driver v1.17.10
 )
@@ -126,7 +126,7 @@ require (
 	github.com/joho/godotenv v1.6.0-pre.4 // indirect
 	github.com/jonboulle/clockwork v0.5.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/klauspost/compress v1.20.3 // indirect
+	github.com/klauspost/compress v1.20.4 // indirect
 	github.com/klauspost/cpuid/v2 v2.4.1 // indirect
 	github.com/koron/go-ssdp v0.9.1 // indirect
 	github.com/labstack/echo/v4 v4.16.3 // indirect
@@ -151,7 +151,7 @@ require (
 	github.com/marten-seemann/tcp v0.0.0-20210406111302-dfbc87cc63fd // indirect
 	github.com/mattn/go-colorable v0.1.16 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
-	github.com/mattn/go-sqlite3 v1.14.52 // indirect
+	github.com/mattn/go-sqlite3 v1.14.53 // indirect
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
 	github.com/miekg/dns v1.1.73 // indirect
 	github.com/mikioh/tcpinfo v0.0.0-20190314235526-30a79bb1804b // indirect
@@ -263,11 +263,11 @@ require (
 	golang.org/x/mod v0.42.0 // indirect
 	golang.org/x/net v0.62.0 // indirect
 	golang.org/x/oauth2 v0.37.0 // indirect
-	golang.org/x/sync v0.24.0 // indirect
+	golang.org/x/sync v0.25.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/telemetry v0.0.0-20261021172232-6cd571d43fbb // indirect
 	golang.org/x/term v0.47.0 // indirect
-	golang.org/x/text v0.43.0 // indirect
+	golang.org/x/text v0.44.0 // indirect
 	golang.org/x/time v0.16.0 // indirect
 	golang.org/x/tools v0.52.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
